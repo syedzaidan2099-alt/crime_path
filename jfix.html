@@ -1,0 +1,1772 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Crime Path - Haunted Pixel Estate</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@600;700&display=swap');
+    :root{--panel:rgba(20, 26, 33, 0.92);--line:#3a4856;--forest:#1b2a38;--rust:#c0392b;--accent:#f39c12;--serif:'Playfair Display',Georgia,serif;--sans:'DM Sans',Arial,sans-serif;--mono:'DM Mono',monospace}
+    *{box-sizing:border-box}
+    body{margin:0;width:100vw;height:100vh;background:#05080c;color:#f8f5eb;font-family:var(--sans);overflow:hidden}
+    button,input{font:inherit}
+
+    /* Fullscreen Game Canvas & Scroller */
+    #game-container{position:fixed;inset:0;width:100vw;height:100vh;z-index:1;overflow:hidden}
+    #game-container canvas{display:block;width:2400px;height:1600px;image-rendering:pixelated}
+
+    /* Floating HUD Elements */
+    #hud-top{position:fixed;top:15px;left:20px;z-index:10;display:flex;gap:15px;align-items:center;background:var(--panel);border:1px solid var(--line);padding:8px 16px;border-radius:8px;font:11px var(--mono);letter-spacing:1px;backdrop-filter:blur(6px);box-shadow:0 4px 20px rgba(0,0,0,0.4)}
+    #hud-top span{color:var(--accent)}
+
+    #notebook-hud{position:fixed;top:15px;right:20px;z-index:10;width:290px;background:var(--panel);border:1px solid var(--line);padding:14px;border-radius:8px;backdrop-filter:blur(6px);box-shadow:0 4px 20px rgba(0,0,0,0.4);font-size:12px}
+    #notebook-title{font:600 11px var(--mono);text-transform:uppercase;margin-bottom:8px;color:var(--accent);display:flex;justify-content:space-between}
+    #clue-list{max-height:130px;overflow-y:auto;display:grid;gap:6px;font-size:11px}
+    .evidence-item{background:#16212b;padding:8px;border:1px solid #2c3a47;border-left:3px solid var(--accent);color:#d1d0c4;border-radius:4px}
+    
+    #accuse-btn{width:100%;margin-top:10px;padding:9px;background:var(--rust);color:white;border:none;font-weight:600;cursor:pointer;text-transform:uppercase;font-family:var(--mono);font-size:11px;letter-spacing:1px;border-radius:4px;transition:0.2s}
+    #accuse-btn:hover{background:#e74c3c;transform:translateY(-1px)}
+
+    #hint{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);z-index:10;background:var(--panel);border:1px solid var(--line);padding:8px 18px;border-radius:20px;font:11px var(--mono);letter-spacing:1px;backdrop-filter:blur(6px);pointer-events:none;box-shadow:0 4px 20px rgba(0,0,0,0.4)}
+
+    .toast{position:fixed;left:50%;bottom:80px;z-index:50;transform:translate(-50%,12px);opacity:0;padding:10px 18px;background:var(--forest);border:1px solid var(--accent);color:#f8f5eb;font:11px var(--mono);transition:opacity .2s,transform .2s;pointer-events:none;border-radius:6px}
+    .toast.show{opacity:1;transform:translate(-50%,0)}
+
+    /* AI Interrogation Box */
+    #chat-box {
+      display: none; position: fixed; bottom: 25px; left: 50%; transform: translateX(-50%);
+      width: min(680px, 92%); padding: 18px; background: rgba(18, 24, 32, 0.95); border: 2px solid var(--accent);
+      box-shadow: 0 12px 40px rgba(0,0,0,0.8); border-radius: 10px; z-index: 100; color: white; backdrop-filter: blur(8px);
+    }
+    #chat-header { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; font-size: 12px; font-family: var(--mono); }
+    #chat-name { font-weight: bold; font-size: 16px; font-family: var(--serif); color: var(--accent); }
+    #trust-bar { flex: 1; height: 8px; background: #2c3a47; border-radius: 4px; overflow: hidden; }
+    #trust-fill { height: 100%; width: 30%; background: #2ecc71; transition: width 0.3s; }
+    #messages { height: 190px; overflow-y: auto; overflow-wrap: anywhere; line-height: 1.5; margin-bottom: 12px; font-size: 13px; border: 1px solid #2c3a47; padding: 12px; background: rgba(10, 14, 18, 0.7); font-family: var(--sans); border-radius: 6px; }
+    #chat-form { display: flex; gap: 8px; }
+    #message-input { flex: 1; min-width: 0; padding: 10px; border: 1px solid #2c3a47; background: #0d131a; color: white; font-size: 13px; border-radius: 6px; font-family: var(--sans); }
+    .chat-btn { padding: 10px 18px; border: none; background: #2980b9; color: white; cursor: pointer; font-family: var(--mono); font-size: 11px; text-transform: uppercase; border-radius: 6px; font-weight: 600; }
+    #close-chat { background: #7f8c8d; margin-top: 8px; width: 100%; }
+    .thinking { opacity: 0.6; font-style: italic; }
+
+    /* Overlay Card */
+    #overlay { display: none; position: fixed; inset: 0; background: rgba(5, 8, 12, 0.88); align-items: center; justify-content: center; z-index: 200; backdrop-filter: blur(8px); }
+    #overlay-card { width: min(620px, 90%); max-height: 90vh; overflow-y: auto; background: #16212b; border: 2px solid var(--accent); padding: 32px; text-align: center; color: #f8f5eb; border-radius: 12px; box-shadow: 0 10px 40px rgba(0,0,0,0.8); }
+    #overlay-card h2 { margin-top: 0; font-family: var(--serif); font-size: 26px; color: var(--accent); }
+    #overlay-card p { line-height: 1.6; font-size: 14px; color: #d1d0c4; text-align: left; white-space: pre-line; }
+    #overlay-buttons { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; margin-top: 24px; }
+    #overlay-buttons button { padding: 10px 20px; background: var(--forest); border: 1px solid var(--accent); color: white; cursor: pointer; font-family: var(--mono); font-size: 11px; text-transform: uppercase; border-radius: 6px; font-weight: 600; }
+    #rumor-panel{display:none;position:fixed;top:70px;left:20px;z-index:10;width:300px;max-height:60vh;overflow-y:auto;background:var(--panel);border:1px solid var(--line);padding:12px;border-radius:8px;font:11px var(--mono);backdrop-filter:blur(6px)}
+    #rumor-panel .rm-npc{margin-top:8px;color:#d1d0c4}#rumor-panel .rm-r{margin:3px 0 0 8px;color:#9fb0c0;font-size:10px;line-height:1.4}
+  </style>
+</head>
+<body>
+
+  <div id="game-container"><canvas id="map" width="2400" height="1600"></canvas></div>
+
+  <div id="hud-top">
+    <span>BLACKWOOD ESTATE</span>
+    <span id="clock">7:00 AM</span>
+    <span id="weather-label">DEADLINE: 7:00 PM</span>
+  </div>
+
+  <div id="notebook-hud">
+    <div id="notebook-title"><span>EVIDENCE FILE</span><span id="clue-count">0 / 9</span></div>
+    <div id="clue-list">
+      <div style="font-size: 11px; color: #7f8c8d;">No evidence collected yet. Examine the victim and grounds.</div>
+    </div>
+    <button id="accuse-btn" type="button">Make Accusation</button>
+  </div>
+
+  <div id="rumor-panel"></div>
+  <div id="hint">USE WASD OR ARROW KEYS TO EXPLORE THE ESTATE</div>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <div id="chat-box">
+    <div id="chat-header">
+      <span id="chat-name">Name</span>
+      <div id="trust-bar"><div id="trust-fill"></div></div>
+      <span id="trust-text">Trust 3/10</span>
+    </div>
+    <div id="messages"></div>
+    <form id="chat-form">
+      <input id="message-input" type="text" placeholder="Interrogate suspect..." autocomplete="off" required>
+      <button class="chat-btn" type="submit">Send</button>
+    </form>
+    <button class="chat-btn" id="close-chat" type="button">Close Interrogation (Esc)</button>
+  </div>
+
+  <div id="overlay">
+    <div id="overlay-card">
+      <h2 id="overlay-title"></h2>
+      <p id="overlay-text"></p>
+      <div id="overlay-buttons"></div>
+    </div>
+  </div>
+
+<script>
+(() => {
+  'use strict';
+
+  const GROQ_API_KEY = "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";
+  const GROQ_MODEL = "openai/gpt-oss-20b";
+  const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
+
+  const MAX_HISTORY_MESSAGES = 20;
+  const MIN_CLUES_TO_ACCUSE = 2;
+  const TOTAL_AVAILABLE_CLUES = 9;
+  const TOTAL_KEY_CLUES = 5;
+  const CULPRIT_ID = "partner";
+
+  const START_MINUTES = 7 * 60; // 7:00 AM
+  const DEADLINE_MINUTES = 19 * 60; // 7:00 PM hard deadline
+  const GAME_MINUTES_PER_SECOND = 2; // Time progresses briskly for tension
+
+  const W = 2400, H = 1600;
+  const canvas = document.getElementById('map'), ctx = canvas.getContext('2d'), keys = new Set();
+
+  const rooms = [
+    { name:'GRAND FOYER', x:850, y:900, w:650, h:650, bx:1030, wallColor:'#2a3628', floorColor:'#52364c', wallpaper:'purple' },
+    { name:'GOTHIC STUDY', x:250, y:300, w:600, h:580, wallColor:'#213d2f', floorColor:'#4a2b35', wallpaper:'green' },
+    { name:'GRAND HALL', x:850, y:300, w:650, h:580, wallColor:'#2b2230', floorColor:'#4a3340', wallpaper:'purple' },
+    { name:'BALLROOM', x:1500, y:300, w:650, h:580, wallColor:'#1e2b37', floorColor:'#3d2838', wallpaper:'purple' },
+    { name:'CONSERVATORY', x:250, y:950, w:600, h:600, wallColor:'#193322', floorColor:'#3b2e2b', wallpaper:'green' },
+    { name:'CHAPEL & COURTYARD', x:1500, y:950, w:650, h:600, wallColor:'#282736', floorColor:'#2b2738', wallpaper:'purple', outdoor: true }
+  ];
+
+  const walls = [
+    [250,250,2150,250],[2150,250,2150,1550],[2150,1550,250,1550],[250,1550,250,250],
+    [850,250,850,720],[850,1030,850,1230],[850,1400,850,1550],
+    [1500,250,1500,720],[1500,1030,1500,1230],[1500,1400,1500,1550],
+    [250,880,850,880],[1030,880,2150,880]
+  ];
+
+  const CHARACTERS = [
+    {
+      id: 'wife', name: 'Eleanor Blackwood', shortName: 'Eleanor', role: 'Wife / Suspect',
+      x: 1700, y: 500, vx: 0.03, vy: 0.02, wanderTimer: 0, walking: true,
+      hairColor: '#3a2022', eyeColor: '#e74c3c', vestColor: '#8e44ad', jacketColor: '#d6a2e8', pantsColor: '#341f97', skinTone: '#fcd5ce',
+      hat: false, beard: false, longHair: true, startTrust: 2, clueTrustNeeded: 6, greeting: "Detective. Make your inquiry brief.",
+      personality: "Proud, elegant, guarded former stage actress. Bitter about Edward's controlling nature and recent changes to his will.",
+      secret: "Argued with Edward at 9:30 about his new will and took a solicitor's letter.",
+      clue: "I did go to the study at half past nine and took the letter, but left him alive.",
+      summary: "Eleanor took a letter regarding Edward's will at 9:30, leaving him alive.",
+      keyClue: false
+    },
+    {
+      id: 'cook', name: 'Mrs. Margaret Hale', shortName: 'Mrs. Hale', role: 'The Cook',
+      x: 550, y: 1200, vx: -0.02, vy: 0.03, wanderTimer: 0, walking: true,
+      hairColor: '#7f8c8d', eyeColor: '#27ae60', vestColor: '#ecf0f1', jacketColor: '#b2bec3', pantsColor: '#2d3436', skinTone: '#f8c291',
+      hat: false, beard: false, longHair: false, startTrust: 3, clueTrustNeeded: 6, greeting: "Is it... about last night, sir?",
+      personality: "Anxious, precise, easily frightened by high society. Deeply loyal to the estate but terrified of police involvement.",
+      secret: "Heard Edward invite Charles to the study at 11. Saw Edward dead at 11:40.",
+      clue: "I heard Mr. Blackwood tell Mr. Whitmore to come at eleven. At 11:40, I saw him dead.",
+      summary: "Mrs. Hale overheard Edward invite Charles at 11, and saw Edward dead at 11:40.",
+      keyClue: true
+    },
+    {
+      id: 'doctor', name: 'Dr. Arthur Reed', shortName: 'Dr. Reed', role: 'Family Doctor',
+      x: 500, y: 500, vx: 0.02, vy: -0.03, wanderTimer: 0, walking: true,
+      hairColor: '#bdc3c7', eyeColor: '#2980b9', vestColor: '#34495e', jacketColor: '#576574', pantsColor: '#222f3e', skinTone: '#f1cfa5',
+      hat: false, beard: true, longHair: false, startTrust: 3, clueTrustNeeded: 7, greeting: "I have already stated my medical verdict.",
+      personality: "Dignified, vain, prickly about his professional reputation. Views the servants as uneducated.",
+      secret: "Guessed time of death to appear confident.",
+      clue: "My notes put death at about eleven o'clock, well after I left.",
+      summary: "Dr. Reed admits death occurred around 11 PM, after he had left.",
+      keyClue: false
+    },
+    {
+      id: 'partner', name: 'Charles Whitmore', shortName: 'Charles', role: 'Business Partner',
+      x: 1800, y: 1200, vx: -0.03, vy: -0.02, wanderTimer: 0, walking: true,
+      hairColor: '#2c2c34', eyeColor: '#f39c12', vestColor: '#d4a94a', jacketColor: '#5a2d3a', pantsColor: '#1f2430', skinTone: '#e8b894',
+      hat: true, hatColor: '#1d1a22', beard: true, longHair: false, startTrust: 3, clueTrustNeeded: 8, greeting: "Detective, a tragic affair. How can I assist?",
+      personality: "Smooth, calculated, respectable businessman with a hidden ruthless streak. Extremely defensive when questioned.",
+      secret: "Embezzled funds, struck Edward at 11, and staged the locked room.",
+      clue: "What a pity about the empty safe. Whoever took that document knew Edward's habits.",
+      summary: "Charles revealed knowledge of the empty safe without being told.",
+      keyClue: true
+    }
+  ];
+
+  const OBJECTS = [
+    { 
+      id: 'victim', 
+      name: 'Victim: Edward Blackwood', 
+      type: 'victim', 
+      x: 580, 
+      y: 550, 
+      summary: 'Edward Blackwood found dead in his study from blunt force trauma with deadbolted doors.', 
+      description: "DETAILED INVESTIGATION REPORT: THE MURDER OF EDWARD BLACKWOOD\n\n" +
+                   "• Victim Profile: Edward Blackwood, industrialist tycoon and sole proprietor of Blackwood Manor, found slumped on the parquet flooring of the North Gothic Study.\n\n" +
+                   "• Forensic State: Examination reveals a severe, fatal blow to the rear occipital lobe caused by a heavy blunt instrument. Rigor mortis and body temperature suggest death occurred late into the stormy night.\n\n" +
+                   "• Crime Scene Anomalies: When the household discovered the body at dawn, all windows and heavy double doors were deadbolted from the inside, creating a classic locked-room mystery.\n\n" +
+                   "• Environmental Clues: A half-empty crystal tumbler of expensive brandy rests undisturbed on the mahogany desk alongside an open ledger. Dr. Arthur Reed initially estimated the time of death around 11:00 PM, though conflicting accounts from the household complicate the timeline.",
+      keyClue: false
+    },
+    { 
+      id: 'ornament', 
+      name: 'Bronze ornament', 
+      type: 'ornament', 
+      x: 450, 
+      y: 450, 
+      summary: 'Heavy bronze mantelpiece ornament bearing microscopic blood traces and hair fibers.', 
+      description: "FORENSIC ANALYSIS: THE BRONZE ORNAMENT\n\n" +
+                   "• Description: A heavy, antique cast-bronze figurine recovered from the study's marble fireplace mantelpiece.\n\n" +
+                   "• Physical Findings: While the object appears wiped down hastily with a cloth, forensic dusting uncovers microscopic traces of dried blood and gray hair fibers embedded in its ornate base.\n\n" +
+                   "• Detective Conclusion: This heavy artifact matches the precise dimensions of the wound inflicted on the back of Edward Blackwood's head, confirming it as the primary murder weapon.",
+      keyClue: true
+    },
+    { 
+      id: 'safe', 
+      name: 'Wall safe', 
+      type: 'safe', 
+      x: 700, 
+      y: 350, 
+      summary: 'Concealed wall safe left wide open with confidential documents missing.', 
+      description: "CRIME SCENE INSPECTION: THE CONCEALED WALL SAFE\n\n" +
+                   "• Location: Hidden behind a heavy oil painting on the north wall of the study.\n\n" +
+                   "• Condition: The heavy steel dial mechanism was opened smoothly without any signs of mechanical forcing, drilling, or explosive charges.\n\n" +
+                   "• Detective Conclusion: Whoever opened the safe possessed the exact numerical combination or master key. Several confidential partnership contracts and solicitor papers are missing from the velvet-lined interior.",
+      keyClue: true
+    },
+    { 
+      id: 'lock', 
+      name: 'Study door lock', 
+      type: 'lock', 
+      x: 350, 
+      y: 750, 
+      summary: 'Subtle tool and pliers marks prove the study door was locked from the outside.', 
+      description: "FORENSIC EXAMINATION: THE STUDY DOOR DEADBOLT\n\n" +
+                   "• Inspection: Detailed scrutiny of the brass deadbolt mechanism on the outer hallway side of the study door.\n\n" +
+                   "• Physical Findings: Distinct, microscopic scratch marks and tool bite impressions consistent with heavy-duty locksmith pliers.\n\n" +
+                   "• Detective Conclusion: The 'locked room' was a deliberate fabrication. The killer murdered Edward, exited the room, and manipulated the lock mechanism externally using specialized tools to divert suspicion.",
+      keyClue: true
+    },
+    { 
+      id: 'ledgers', 
+      name: 'Company ledgers', 
+      type: 'ledgers', 
+      x: 1900, 
+      y: 450, 
+      summary: 'Secret financial ledgers exposing massive corporate embezzlement by Charles Whitmore.', 
+      description: "AUDIT REPORT: BLACKWOOD ENTERPRISES FINANCIAL LEDGERS\n\n" +
+                   "• Discovery: Recovered from the private drawing-room desk, detailing corporate accounts spanning the previous three fiscal quarters.\n\n" +
+                   "• Financial Irregularities: Systematic siphoning of company assets exceeding fifty thousand pounds into private offshore accounts.\n\n" +
+                   "• Detective Conclusion: All unauthorized transfers were authorized under the administrative signature of Charles Whitmore, providing a powerful financial motive for murder if Edward threatened exposure.",
+      keyClue: true
+    }
+  ];
+
+  const ENDINGS = {
+    justice: { title: "Ending 1: Justice Served", text: "You gathered sufficient proof of Charles Whitmore's guilt and his staged room. He is arrested and put on trial!" },
+    wrong: { title: "Ending 2: Premature Accusation", text: "Your accusation lacks the solid foundational evidence needed to hold up in court. The real culprit slips away." },
+    wrongHale: { title: "Ending 2: Tragic Mistake", text: "Mrs. Hale is wrongfully accused while the actual murderer walks free from Blackwood Manor." },
+    convenient: { title: "Ending 3: Convenient Truth", text: "Dr. Reed is disgraced for his negligence, but the true perpetrator remains unpunished." },
+    perfect: { title: "Ending 5: Perfect Investigation", text: "Flawless detective work! You uncovered every single piece of key evidence and secured total justice." },
+    timeout: { title: "Ending 4: Time Expired", text: "7:00 PM has arrived. Scotland Yard has taken over the jurisdiction and dismissed your amateur inquiry due to the missed deadline." }
+  };
+
+  const player = { id: 'detective', name: 'Detective', shortName: 'Detective', x: 500, y: 650, hairColor: '#4a3319', eyeColor: '#16a085', vestColor: '#e9e2cf', jacketColor: '#9b7b4e', pantsColor: '#2d3a4f', skinTone: '#f3cfa6', hat: true, hatColor: '#2a211a', beard: false, longHair: false, facing: 'down', walking: false, step: 0 };
+
+  const state = {};
+  CHARACTERS.forEach(c => {
+    state[c.id] = { rep: 0, memories: [], rumors: [], trust: c.startTrust, history: [], log: [{ sender: c.shortName, text: c.greeting }], clueGiven: false };
+  });
+
+  let clues = [];
+  let overlayOpen = false;
+  let chatOpen = false;
+  let currentNpc = null;
+  let waitingForReply = false;
+  let gameMinutes = START_MINUTES;
+  let lastTime = 0, toastTimer = 0;
+  let deadlineTriggered = false;
+
+  function formatTime() {
+    const total = Math.floor(gameMinutes);
+    const hours = Math.floor(total / 60);
+    const minutes = total % 60;
+    return (hours % 12 || 12) + ":" + String(minutes).padStart(2, "0") + " " + (hours >= 12 ? "PM" : "AM");
+  }
+
+  // ===== GOSSIP & REPUTATION NETWORK =====
+  const GULLIBILITY = { wife: 0.4, cook: 0.85, doctor: 0.3, partner: 0.15 };
+  const clampRep = v => Math.max(-10, Math.min(10, v));
+  let lastGossip = START_MINUTES;
+  const esc = t => String(t).replace(/[&<>"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch]));
+
+  // hidden standing shifts the trust needed to reveal a clue
+  function clueThreshold(npc) { return Math.max(1, Math.min(10, npc.clueTrustNeeded - Math.round(state[npc.id].rep / 3))); }
+
+  function guessMemory(msg) {
+    const m = msg.toLowerCase(), q = msg.slice(0, 80);
+    if (/(kill|murder|accus|liar|lying|arrest|guilty|threat)/.test(m)) return { memory: 'Detective pressed me hard: "' + q + '"', importance: 4, valence: -1 };
+    if (/(thank|please|promise|help|sorry|protect|trust)/.test(m)) return { memory: 'Detective was courteous: "' + q + '"', importance: 3, valence: 1 };
+    return { memory: 'Detective asked: "' + q + '"', importance: 2, valence: 0 };
+  }
+
+  function addMemory(npcId, text, importance, valence, source) {
+    const st = state[npcId];
+    st.memories.push({ gid: npcId + '#' + Date.now() + Math.floor(Math.random() * 1e4), text, importance, valence, source: source || 'direct', time: formatTime(), told: [] });
+    if (st.memories.length > 12) st.memories.shift();
+    st.rep = clampRep(st.rep + valence * (importance >= 4 ? 2 : 1));
+    renderRumorPanel();
+  }
+
+  function witnessExamine(o) {
+    CHARACTERS.forEach(c => {
+      if (Math.hypot(c.x - player.x, c.y - player.y) < 450)
+        addMemory(c.id, 'Saw the detective examining the ' + o.name.toLowerCase(), o.keyClue ? 3 : 2, (c.id === 'partner' && o.keyClue) ? -1 : 0, 'witness');
+    });
+  }
+
+  function gossipTick() {
+    let spread = 0;
+    CHARACTERS.forEach(a => {
+      const sa = state[a.id];
+      const pool = sa.memories.map(m => ({ m, hops: 0 })).concat(sa.rumors.filter(r => r.believed).map(r => ({ m: r, hops: r.hops })));
+      pool.forEach(({ m, hops }) => {
+        if (m.importance < 3 || hops >= 2) return;
+        m.told = m.told || [];
+        CHARACTERS.forEach(b => {
+          if (b === a || m.told.includes(b.id)) return;
+          const sb = state[b.id];
+          if (sb.memories.some(x => x.gid === m.gid) || sb.rumors.some(x => x.gid === m.gid)) { m.told.push(b.id); return; }
+          const d = Math.hypot(a.x - b.x, a.y - b.y);
+          if (Math.random() > (d < 700 ? 1 : 0.2)) return;
+          m.told.push(b.id);
+          const believed = Math.random() < (GULLIBILITY[b.id] ?? 0.5);
+          sb.rumors.push({ gid: m.gid, text: m.text, from: a.shortName, importance: m.importance, valence: m.valence, hops: hops + 1, believed, time: formatTime(), told: [a.id] });
+          if (sb.rumors.length > 8) sb.rumors.shift();
+          if (believed) sb.rep = clampRep(sb.rep + m.valence);
+          spread++;
+        });
+      });
+    });
+    CHARACTERS.forEach(c => { const s = state[c.id]; if (s.rep < 0 && Math.random() < 0.15) s.rep++; });
+    if (spread) toast('WORD IS SPREADING THROUGH THE MANOR...');
+    renderRumorPanel();
+  }
+
+  function toggleRumorPanel() {
+    const p = document.getElementById('rumor-panel');
+    p.style.display = p.style.display === 'block' ? 'none' : 'block';
+    renderRumorPanel();
+  }
+  function renderRumorPanel() {
+    const p = document.getElementById('rumor-panel');
+    if (!p || p.style.display !== 'block') return;
+    p.innerHTML = '<strong style="color:var(--accent)">RUMOR MILL (G to close)</strong>' + CHARACTERS.map(c => {
+      const s = state[c.id], mood = s.rep >= 2 ? 'warm' : s.rep <= -4 ? 'refuses to talk' : s.rep <= -2 ? 'cold' : 'neutral';
+      return '<div class="rm-npc"><strong>' + c.shortName + '</strong> \u00b7 standing ' + (s.rep > 0 ? '+' : '') + s.rep + ' (' + mood + ')' +
+        s.rumors.slice(-3).map(r => '<div class="rm-r">' + (r.believed ? '\u2714 believes' : '? doubts') + ' (via ' + esc(r.from) + '): ' + esc(r.text) + '</div>').join('') + '</div>';
+    }).join('');
+  }
+
+  function addClue(id, from, text, key) {
+    if (clues.some(c => c.id === id)) return false;
+    clues.push({ id, from, text, key });
+    updateInventoryUI();
+    return true;
+  }
+
+  function updateInventoryUI() {
+    document.getElementById("clue-count").textContent = clues.length + " / " + TOTAL_AVAILABLE_CLUES;
+    const list = document.getElementById("clue-list");
+    list.innerHTML = "";
+    if (clues.length === 0) {
+      list.innerHTML = '<div style="font-size: 11px; color: #7f8c8d;">No evidence collected yet. Examine the victim and grounds.</div>';
+      return;
+    }
+    clues.forEach(c => {
+      const row = document.createElement("div");
+      row.className = "evidence-item";
+      row.innerHTML = `<strong>${c.from}:</strong> ${c.text}`;
+      list.appendChild(row);
+    });
+  }
+
+  function toast(message) {
+    const t = document.getElementById('toast');
+    t.textContent = message; t.classList.add('show');
+    clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('show'), 2500);
+  }
+
+  function showOverlay(title, text, buttons) {
+    overlayOpen = true;
+    document.getElementById("overlay-title").textContent = title;
+    document.getElementById("overlay-text").textContent = text;
+    const box = document.getElementById("overlay-buttons");
+    box.innerHTML = "";
+    buttons.forEach(b => {
+      const btn = document.createElement("button");
+      btn.textContent = b.label; btn.addEventListener("click", b.onClick);
+      box.appendChild(btn);
+    });
+    document.getElementById("overlay").style.display = "flex";
+  }
+
+  function hideOverlay() {
+    overlayOpen = false;
+    document.getElementById("overlay").style.display = "none";
+  }
+
+  function segmentDistance(px,py,x1,y1,x2,y2){const dx=x2-x1,dy=y2-y1,len=dx*dx+dy*dy,t=len?Math.max(0,Math.min(1,((px-x1)*dx+(py-y1)*dy)/len)):0;return Math.hypot(px-x1-t*dx,py-y1-t*dy)}
+  const FOOT=36;
+  function blocked(x,y){
+    const fy=y+FOOT;
+    if(fy>1536||fy<250)return true;
+    if(walls.some(([x1,y1,x2,y2])=>segmentDistance(x,fy,x1,y1,x2,y2)<14))return true;
+    return rooms.some(rm=>x>(rm.bx||rm.x)&&x<rm.x+rm.w&&fy>(rm.y<880?250:892)&&fy<rm.y+104);
+  }
+  function movePlayer(dx,dy){if(!blocked(player.x+dx,player.y))player.x+=dx;if(!blocked(player.x,player.y+dy))player.y+=dy}
+
+  // =====================================================
+  // PIXEL ART ENGINE
+  // =====================================================
+  const PIXEL = (() => {
+    const PX = 3;
+    const AW = Math.ceil(W / PX), AH = Math.ceil(H / PX);
+
+    function mk(w, h, fn) {
+      const c = document.createElement('canvas');
+      c.width = w; c.height = h;
+      const g = c.getContext('2d');
+      g.imageSmoothingEnabled = false;
+      if (fn) fn(g, w, h);
+      return c;
+    }
+    function R(g, color, x, y, w, h) {
+      if (w <= 0 || h <= 0) return;
+      g.fillStyle = color;
+      g.fillRect(Math.round(x), Math.round(y), w, h);
+    }
+    function hexRgb(h) { const n = parseInt(h.slice(1), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; }
+    function toHex(r, g, b) { return '#' + ((1 << 24) | (r << 16) | (g << 8) | b).toString(16).slice(1); }
+    function shade(h, f) {
+      const c = hexRgb(h), t = f < 0 ? 0 : 255, p = Math.abs(f);
+      const m = v => Math.max(0, Math.min(255, Math.round(v + (t - v) * p)));
+      return toHex(m(c[0]), m(c[1]), m(c[2]));
+    }
+    function rng(seed) {
+      let a = seed | 0;
+      return () => {
+        a = (a + 0x6D2B79F5) | 0;
+        let t = Math.imul(a ^ (a >>> 15), 1 | a);
+        t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+      };
+    }
+    function ellipseFill(g, cx, cy, rx, ry, color) {
+      for (let y = -ry; y <= ry; y++) {
+        const half = Math.floor(rx * Math.sqrt(1 - (y * y) / (ry * ry)));
+        R(g, color, cx - half, cy + y, half * 2 + 1, 1);
+      }
+    }
+    function bricks(g, x, y, w, h, base, rnd) {
+      R(g, shade(base, -0.5), x, y, w, h);
+      for (let row = 0; row * 4 < h; row++) {
+        const off = (row % 2) * 4;
+        for (let bx = x - off; bx < x + w; bx += 8) {
+          const sx = Math.max(bx, x), ex = Math.min(bx + 7, x + w);
+          const by = y + row * 4, bh = Math.min(3, y + h - by);
+          if (ex > sx && bh > 0) {
+            const t = shade(base, (rnd() - 0.5) * 0.3);
+            R(g, t, sx, by, ex - sx, bh);
+            R(g, shade(t, 0.2), sx, by, ex - sx, 1);
+          }
+        }
+      }
+    }
+    function flipX(c) {
+      return mk(c.width, c.height, g => { g.translate(c.width, 0); g.scale(-1, 1); g.drawImage(c, 0, 0); });
+    }
+    function outline(c, color) {
+      const tint = mk(c.width, c.height, g => {
+        g.drawImage(c, 0, 0);
+        g.globalCompositeOperation = 'source-in';
+        g.fillStyle = color || '#150d12';
+        g.fillRect(0, 0, c.width, c.height);
+      });
+      return mk(c.width + 2, c.height + 2, g => {
+        [[0, 1], [2, 1], [1, 0], [1, 2]].forEach(o => g.drawImage(tint, o[0], o[1]));
+        g.drawImage(c, 1, 1);
+      });
+    }
+
+    const cache = {};
+    function S(key, make) { return cache[key] || (cache[key] = make()); }
+
+    function paintFloor(g, rm) {
+      const x0 = Math.round(rm.x / PX), y0 = Math.round(rm.y / PX);
+      const w = Math.round(rm.w / PX), h = Math.round(rm.h / PX);
+      const rnd = rng(rm.x * 7 + rm.y);
+      const base = rm.floorColor;
+      if (rm.outdoor) {
+        R(g, shade(base, -0.35), x0, y0, w, h);
+        for (let y = y0; y < y0 + h; y += 12) {
+          let x = x0 - ((Math.floor((y - y0) / 12) % 2) * 9);
+          while (x < x0 + w) {
+            const sw = 14 + Math.floor(rnd() * 8);
+            const tone = shade(base, (rnd() - 0.5) * 0.4);
+            const sx = Math.max(x, x0), ex = Math.min(x + sw - 1, x0 + w);
+            if (ex > sx) {
+              R(g, tone, sx, y, ex - sx, 11);
+              R(g, shade(tone, 0.2), sx, y, ex - sx, 1);
+              R(g, shade(tone, -0.25), sx, y + 10, ex - sx, 1);
+              if (rnd() < 0.35) R(g, '#3d5a3a', sx + Math.floor(rnd() * (ex - sx - 3)), y + 8 + Math.floor(rnd() * 2), 3, 1);
+            }
+            x += sw;
+          }
+        }
+        return;
+      }
+      for (let y = y0; y < y0 + h; y += 8) {
+        let x = x0 - Math.floor(rnd() * 30);
+        while (x < x0 + w) {
+          const len = 36 + Math.floor(rnd() * 50);
+          const tone = shade(base, (rnd() - 0.5) * 0.24);
+          const sx = Math.max(x, x0), ex = Math.min(x + len, x0 + w);
+          if (ex > sx) {
+            R(g, tone, sx, y, ex - sx, 7);
+            R(g, shade(tone, 0.14), sx, y, ex - sx, 1);
+            R(g, shade(tone, -0.35), sx, y + 7, ex - sx, 1);
+            for (let k = 0; k < (ex - sx) / 9; k++) {
+              R(g, shade(tone, -0.14), sx + Math.floor(rnd() * (ex - sx)), y + 1 + Math.floor(rnd() * 5), 2 + Math.floor(rnd() * 4), 1);
+            }
+            R(g, shade(tone, -0.45), sx + 2, y + 3, 1, 1);
+            R(g, shade(tone, -0.45), ex - 3, y + 3, 1, 1);
+            if (x + len <= x0 + w) R(g, shade(base, -0.55), ex - 1, y, 1, 8);
+          }
+          x += len;
+        }
+      }
+    }
+
+    function paintBackWall(g, rm, rnd) {
+      const bx = rm.bx || rm.x;
+      const ext = Math.max(0, Math.round((rm.y - (rm.y < 880 ? 250 : 892)) / PX));
+      const x0 = Math.round(bx / PX), y0 = Math.round(rm.y / PX) - ext;
+      const w = Math.round((rm.x + rm.w - bx) / PX), wh = Math.round(110 / PX) + ext;
+      if (rm.outdoor) {
+        bricks(g, x0, y0, w, wh - 3, '#55506a', rnd);
+        R(g, '#17141f', x0, y0 + wh - 3, w, 3);
+        R(g, '#7a7592', x0, y0, w, 1);
+        return;
+      }
+      const dark = rm.wallColor;
+      const light = rm.wallpaper === 'green' ? '#3f6049' : '#58395f';
+      const pw = wh - 12;
+      for (let x = 0; x < w; x++) {
+        R(g, Math.floor(x / 4) % 2 === 0 ? light : dark, x0 + x, y0, 1, pw);
+      }
+      for (let x = 0; x < w; x += 8) R(g, shade(light, -0.25), x0 + x + 3, y0, 1, pw);
+      for (let yy = 7; yy < pw - 3; yy += 10) {
+        for (let xx = 0; xx < w; xx += 16) {
+          const dx = x0 + xx, dy = y0 + yy, c = shade(light, 0.28);
+          R(g, c, dx + 1, dy, 1, 1); R(g, c, dx, dy + 1, 3, 1); R(g, c, dx + 1, dy + 2, 1, 1);
+        }
+      }
+      const yb = y0 + pw;
+      R(g, '#2e1c14', x0, yb, w, wh - pw - 2);
+      R(g, '#8a6540', x0, yb, w, 1);
+      R(g, '#5e4129', x0, yb + 1, w, 1);
+      for (let px = 0; px < w; px += 14) {
+        R(g, '#3d2619', x0 + px + 1, yb + 3, 12, 6);
+        R(g, '#4f3322', x0 + px + 1, yb + 3, 12, 1);
+        R(g, '#24150e', x0 + px + 1, yb + 8, 12, 1);
+      }
+      R(g, '#150d09', x0, y0 + wh - 2, w, 2);
+      R(g, '#5a4030', x0, y0 + 1, w, 1);
+      R(g, '#17110d', x0, y0, w, 1);
+    }
+
+    function paintWalls(g) {
+      const rnd = rng(99);
+      walls.forEach(wl => {
+        const x1 = wl[0], y1 = wl[1], x2 = wl[2], y2 = wl[3];
+        const ax1 = Math.round(Math.min(x1, x2) / PX), ax2 = Math.round(Math.max(x1, x2) / PX);
+        const ay1 = Math.round(Math.min(y1, y2) / PX), ay2 = Math.round(Math.max(y1, y2) / PX);
+        if (y1 === y2) {
+          const w = ax2 - ax1 + 8, y = ay1 - 4;
+          bricks(g, ax1 - 4, y + 3, w, 6, '#5d4d3d', rnd);
+          R(g, '#8c7862', ax1 - 4, y, w, 3);
+          R(g, '#b09a7e', ax1 - 4, y, w, 1);
+          R(g, '#2a1f16', ax1 - 4, y + 9, w, 1);
+        } else {
+          const h = ay2 - ay1 + 8, x = ax1 - 4;
+          bricks(g, x, ay1 - 4, 8, h, '#5d4d3d', rnd);
+          R(g, '#8c7862', x, ay1 - 4, 2, h);
+          R(g, '#b09a7e', x, ay1 - 4, 1, h);
+          R(g, '#2a1f16', x + 7, ay1 - 4, 1, h);
+        }
+      });
+    }
+
+    function paintRug(g, cx, cy, rx, ry, c1, c2) {
+      ellipseFill(g, cx, cy + 1, rx, ry, 'rgba(0,0,0,0.25)');
+      ellipseFill(g, cx, cy, rx, ry, shade(c1, -0.4));
+      ellipseFill(g, cx, cy, rx - 2, ry - 2, '#b08a3c');
+      ellipseFill(g, cx, cy, rx - 4, ry - 3, c1);
+      ellipseFill(g, cx, cy, rx - 9, ry - 6, c2);
+      ellipseFill(g, cx, cy, rx - 13, ry - 9, shade(c1, 0.1));
+      for (let k = -rx + 5; k < rx - 5; k += 6) {
+        R(g, shade(c1, 0.25), cx + k, cy - ry + 3, 2, 1);
+        R(g, shade(c1, 0.25), cx + k, cy + ry - 3, 2, 1);
+      }
+    }
+    function paintRunner(g, x, y, w, h, c1) {
+      R(g, 'rgba(0,0,0,0.25)', x + 1, y + 1, w, h);
+      R(g, shade(c1, -0.4), x, y, w, h);
+      R(g, '#b08a3c', x + 1, y + 1, w - 2, h - 2);
+      R(g, c1, x + 3, y + 2, w - 6, h - 4);
+      for (let k = y + 8; k < y + h - 8; k += 10) {
+        R(g, shade(c1, 0.25), x + w / 2 - 3, k, 6, 1);
+        R(g, shade(c1, 0.25), x + w / 2 - 1, k - 1, 2, 3);
+      }
+    }
+
+    function sprFireplace(f) {
+      return S('fire' + f, () => mk(36, 34, g => {
+        const rnd = rng(5);
+        bricks(g, 3, 0, 30, 8, '#8a8579', rnd);
+        R(g, '#4a2f1d', 0, 7, 36, 4); R(g, '#8a6038', 0, 7, 36, 1); R(g, '#241509', 0, 10, 36, 1);
+        bricks(g, 2, 11, 32, 20, '#8a8579', rnd);
+        R(g, '#0b0708', 9, 14, 18, 17); R(g, '#0b0708', 11, 12, 14, 2);
+        R(g, '#3a2418', 9, 28, 18, 3);
+        g.save(); g.beginPath(); g.rect(9, 12, 18, 19); g.clip();
+        const h = [9, 12, 10][f % 3], o = [0, 1, -1][f % 3];
+        R(g, '#d6451f', 12, 29 - h, 12, h);
+        R(g, '#f08a2a', 14 + o, 26 - h, 8, h);
+        R(g, '#f7c948', 16 + o, 23 - h, 4, h - 2);
+        R(g, '#fff1b0', 17 + o, 29 - h, 2, 4);
+        g.restore();
+        R(g, '#5a3a22', 11, 27, 6, 2); R(g, '#6a4528', 19, 27, 7, 2);
+        R(g, '#6a655b', 0, 31, 36, 3); R(g, '#8f8a7e', 0, 31, 36, 1);
+      }));
+    }
+    function sprBookshelf(seed) {
+      return S('shelf' + seed, () => mk(24, 32, g => {
+        const rnd = rng(seed);
+        R(g, '#3a2416', 0, 0, 24, 32); R(g, '#6a4630', 0, 0, 24, 2);
+        R(g, '#1d110a', 2, 3, 20, 27);
+        const cols = ['#8c2f2f', '#2f5f8c', '#3d7a4a', '#b08a3c', '#6a3d8c', '#8c5a2f', '#2f7a7a'];
+        for (let s = 0; s < 4; s++) {
+          const sy = 3 + s * 7;
+          let x = 2;
+          while (x < 21) {
+            const bw = 2 + Math.floor(rnd() * 2), bh = 4 + Math.floor(rnd() * 3);
+            const col = cols[Math.floor(rnd() * cols.length)];
+            R(g, col, x, sy + 6 - bh, bw, bh);
+            R(g, shade(col, 0.3), x, sy + 6 - bh, 1, bh);
+            x += bw;
+          }
+          R(g, '#5a3a24', 2, sy + 6, 20, 1);
+        }
+        R(g, '#120a06', 0, 30, 24, 2);
+      }));
+    }
+    function sprDesk() {
+      return S('desk', () => mk(40, 24, g => {
+        R(g, '#7a5232', 0, 4, 40, 9); R(g, '#a67a4a', 0, 4, 40, 1); R(g, '#4a2f1d', 0, 12, 40, 1);
+        R(g, '#3a2416', 1, 13, 38, 9);
+        R(g, '#4f321f', 3, 14, 16, 7); R(g, '#4f321f', 21, 14, 16, 7);
+        R(g, '#d4a94a', 10, 17, 2, 1); R(g, '#d4a94a', 28, 17, 2, 1);
+        R(g, '#24160d', 1, 21, 3, 3); R(g, '#24160d', 36, 21, 3, 3);
+        R(g, '#2d4a3a', 6, 6, 16, 5); R(g, '#e9e2cf', 25, 5, 8, 5); R(g, '#c9c2af', 26, 7, 6, 1);
+        R(g, '#111', 23, 5, 2, 3); R(g, '#e9a23b', 35, 6, 3, 3); R(g, '#f7d27a', 35, 6, 1, 3);
+      }));
+    }
+    function sprArmchair(c) {
+      return S('arm' + c, () => mk(20, 20, g => {
+        R(g, shade(c, -0.45), 2, 1, 16, 9); R(g, c, 3, 2, 14, 7); R(g, shade(c, 0.22), 3, 2, 14, 1);
+        R(g, shade(c, -0.3), 0, 8, 5, 10); R(g, c, 1, 8, 3, 9); R(g, shade(c, 0.2), 1, 8, 3, 1);
+        R(g, shade(c, -0.3), 15, 8, 5, 10); R(g, c, 16, 8, 3, 9); R(g, shade(c, 0.2), 16, 8, 3, 1);
+        R(g, shade(c, -0.12), 5, 10, 10, 7); R(g, shade(c, 0.18), 5, 10, 10, 1);
+        R(g, '#24160d', 1, 18, 2, 2); R(g, '#24160d', 17, 18, 2, 2);
+      }));
+    }
+    function sprSofa(c) {
+      return S('sofa' + c, () => mk(40, 20, g => {
+        R(g, shade(c, -0.45), 2, 1, 36, 9); R(g, c, 3, 2, 34, 7); R(g, shade(c, 0.22), 3, 2, 34, 1);
+        R(g, shade(c, -0.3), 0, 8, 5, 10); R(g, c, 1, 8, 3, 9);
+        R(g, shade(c, -0.3), 35, 8, 5, 10); R(g, c, 36, 8, 3, 9);
+        R(g, shade(c, -0.12), 5, 10, 14, 7); R(g, shade(c, -0.12), 21, 10, 14, 7);
+        R(g, shade(c, 0.18), 5, 10, 14, 1); R(g, shade(c, 0.18), 21, 10, 14, 1);
+        R(g, shade(c, -0.4), 19, 10, 2, 7);
+        R(g, '#24160d', 1, 18, 2, 2); R(g, '#24160d', 37, 18, 2, 2);
+      }));
+    }
+    function sprPiano() {
+      return S('piano', () => mk(38, 26, g => {
+        R(g, '#15151c', 0, 2, 38, 12); R(g, '#3a3a4a', 0, 2, 38, 1); R(g, '#0c0c11', 0, 13, 38, 1);
+        R(g, '#1d1d26', 2, 4, 34, 8);
+        R(g, '#eae6d6', 3, 14, 32, 4);
+        for (let k = 3; k < 35; k += 2) R(g, '#9a9686', k + 1, 14, 1, 4);
+        for (let k = 5; k < 33; k += 4) R(g, '#111', k, 14, 2, 2);
+        R(g, '#0c0c11', 0, 18, 38, 4);
+        R(g, '#15151c', 2, 22, 3, 4); R(g, '#15151c', 33, 22, 3, 4);
+      }));
+    }
+    function sprLamp() {
+      return S('lamp', () => mk(10, 26, g => {
+        R(g, '#e8c36a', 1, 2, 8, 8); R(g, '#fff0b0', 3, 3, 4, 5); R(g, '#b9923f', 1, 9, 8, 1);
+        R(g, '#3a2a1a', 4, 10, 2, 13); R(g, '#2a1a10', 2, 23, 6, 3); R(g, '#4a3524', 2, 23, 6, 1);
+      }));
+    }
+    function sprPlant(seed) {
+      return S('plant' + seed, () => mk(16, 24, g => {
+        const rnd = rng(seed);
+        R(g, '#8a4a2a', 4, 15, 8, 8); R(g, '#b0663a', 3, 14, 10, 2); R(g, '#5a2f1a', 4, 22, 8, 1);
+        const greens = ['#2f6b3a', '#3d8a47', '#245a30', '#52a35a'];
+        for (let i = 0; i < 26; i++) {
+          const a = rnd() * Math.PI, r = 3 + rnd() * 6;
+          const x = 8 + Math.cos(a) * r - 1, y = 12 - Math.sin(a) * (r * 1.4);
+          R(g, greens[Math.floor(rnd() * greens.length)], x, y, 3, 3);
+        }
+        R(g, '#52a35a', 7, 4, 2, 2);
+      }));
+    }
+    function sprBarrel() {
+      return S('barrel', () => mk(14, 16, g => {
+        R(g, '#6a4228', 1, 3, 12, 12); R(g, '#8a5a36', 2, 3, 3, 12); R(g, '#3a2416', 10, 3, 3, 12);
+        R(g, '#3a2a1a', 1, 5, 12, 1); R(g, '#3a2a1a', 1, 12, 12, 1);
+        R(g, '#a8703f', 2, 0, 10, 4); R(g, '#6a4228', 3, 1, 8, 2); R(g, '#2a1a10', 2, 15, 10, 1);
+      }));
+    }
+    function sprCrate() {
+      return S('crate', () => mk(14, 14, g => {
+        R(g, '#7a5532', 0, 2, 14, 12); R(g, '#a07444', 0, 2, 14, 2); R(g, '#4a2f1d', 0, 13, 14, 1);
+        R(g, '#4a2f1d', 1, 4, 1, 9); R(g, '#4a2f1d', 12, 4, 1, 9); R(g, '#4a2f1d', 6, 4, 2, 9);
+        R(g, '#5a3a22', 2, 7, 10, 1);
+      }));
+    }
+    function sprClock() {
+      return S('clock', () => mk(12, 34, g => {
+        R(g, '#3a2416', 1, 0, 10, 34); R(g, '#6a4630', 1, 0, 10, 2); R(g, '#4a2f1d', 2, 2, 8, 30);
+        R(g, '#e9e2cf', 3, 4, 6, 6); R(g, '#1a1216', 6, 5, 1, 3); R(g, '#1a1216', 6, 7, 3, 1);
+        R(g, '#120a06', 3, 13, 6, 16); R(g, '#c9a24a', 5, 20, 2, 4); R(g, '#e8cf7a', 5, 20, 1, 2);
+        R(g, '#241509', 0, 32, 12, 2);
+      }));
+    }
+    function sprArmor() {
+      return S('armor', () => mk(12, 30, g => {
+        R(g, '#b02a2a', 5, 0, 2, 3);
+        R(g, '#8d9aa8', 3, 2, 6, 6); R(g, '#c7d0da', 3, 2, 6, 1); R(g, '#222', 4, 5, 4, 1);
+        R(g, '#a5b1bd', 2, 8, 8, 10); R(g, '#d4dce4', 2, 8, 8, 1); R(g, '#6c7886', 8, 9, 2, 9);
+        R(g, '#8d9aa8', 0, 9, 2, 8); R(g, '#8d9aa8', 10, 9, 2, 8);
+        R(g, '#7e8a98', 3, 18, 3, 8); R(g, '#7e8a98', 6, 18, 3, 8);
+        R(g, '#3a2a1a', 0, 26, 12, 4); R(g, '#5a4430', 0, 26, 12, 1);
+      }));
+    }
+    function sprPew() {
+      return S('pew', () => mk(32, 16, g => {
+        R(g, '#4a2f1d', 0, 0, 32, 8); R(g, '#7a5232', 0, 0, 32, 1); R(g, '#33200f', 0, 7, 32, 1);
+        R(g, '#6a4630', 0, 8, 32, 4); R(g, '#8a6038', 0, 8, 32, 1);
+        R(g, '#24160d', 1, 12, 3, 4); R(g, '#24160d', 28, 12, 3, 4);
+      }));
+    }
+    function sprAltar() {
+      return S('altar', () => mk(30, 24, g => {
+        R(g, '#8c8aa0', 2, 8, 26, 14); R(g, '#b7b5cc', 2, 8, 26, 1); R(g, '#5a586e', 2, 21, 26, 1);
+        R(g, '#d9d4c0', 4, 8, 22, 5); R(g, '#b9b49e', 4, 12, 22, 1);
+        R(g, '#d4a94a', 14, 0, 2, 9); R(g, '#d4a94a', 11, 3, 8, 2);
+        R(g, '#e9e2cf', 5, 3, 3, 6); R(g, '#e9e2cf', 22, 3, 3, 6);
+        R(g, '#4a4860', 0, 22, 30, 2);
+      }));
+    }
+    function sprGrave(seed) {
+      return S('grave' + seed, () => mk(12, 16, g => {
+        R(g, '#8a8f99', 2, 2, 8, 12); R(g, '#8a8f99', 3, 1, 6, 1); R(g, '#b4b9c3', 2, 2, 2, 12);
+        R(g, '#5a5f69', 5, 4, 2, 6); R(g, '#5a5f69', 4, 5, 4, 2);
+        R(g, '#4a4f59', 1, 14, 10, 2); R(g, '#3d5a3a', 1, 13, 4, 1);
+      }));
+    }
+    function sprFountain(f) {
+      return S('fountain' + f, () => mk(34, 26, g => {
+        ellipseFill(g, 17, 17, 16, 8, '#6f6f82');
+        ellipseFill(g, 17, 16, 16, 8, '#9a9ab0');
+        ellipseFill(g, 17, 16, 13, 6, f ? '#4f86b8' : '#4a7fb0');
+        ellipseFill(g, 17, 16, 9, 4, f ? '#6aa0cf' : '#5f95c6');
+        R(g, '#8a8aa0', 15, 4, 4, 12); R(g, '#b4b4c8', 15, 4, 1, 12);
+        R(g, '#cfe6f7', 16 + (f ? 1 : 0), 1, 2, 4);
+        R(g, '#cfe6f7', 12 + f, 10 + f, 1, 1); R(g, '#cfe6f7', 22 - f, 11, 1, 1);
+      }));
+    }
+    function sprTable() {
+      return S('table', () => mk(18, 18, g => {
+        ellipseFill(g, 9, 6, 8, 4, '#4a2f1d'); ellipseFill(g, 9, 5, 8, 4, '#7a5232'); ellipseFill(g, 9, 5, 6, 3, '#8a6038');
+        R(g, '#3a2416', 8, 9, 2, 6); R(g, '#3a2416', 5, 15, 8, 2);
+        R(g, '#cfd8dc', 8, 1, 2, 3); R(g, '#e8c36a', 8, 0, 2, 1);
+      }));
+    }
+    function sprBush(seed) {
+      return S('bush' + seed, () => mk(18, 14, g => {
+        const rnd = rng(seed), greens = ['#244a2c', '#2f6b3a', '#1c3a22', '#3d8a47'];
+        for (let i = 0; i < 30; i++) {
+          const x = 1 + rnd() * 13, y = 2 + rnd() * 8;
+          R(g, greens[Math.floor(rnd() * 4)], x, y, 4, 4);
+        }
+        R(g, 'rgba(0,0,0,0.25)', 1, 12, 16, 2);
+      }));
+    }
+    function sprChair() {
+      return S('chair', () => mk(12, 16, g => {
+        R(g, '#4a2f1d', 1, 0, 10, 7); R(g, '#6a4630', 2, 1, 8, 5); R(g, '#7a5232', 1, 0, 10, 1);
+        R(g, '#5a3a24', 0, 7, 12, 4); R(g, '#8a6038', 0, 7, 12, 1);
+        R(g, '#24160d', 1, 11, 2, 5); R(g, '#24160d', 9, 11, 2, 5);
+      }));
+    }
+
+    function sprWindow(kind) {
+      return S('win' + kind, () => mk(14, 22, g => {
+        R(g, '#241a14', 0, 0, 14, 22); R(g, '#5a4636', 0, 0, 14, 1);
+        if (kind === 'stained') {
+          const cs = ['#8c2f2f', '#2f5f8c', '#b08a3c', '#3d7a4a'];
+          for (let r = 0; r < 4; r++) for (let c = 0; c < 2; c++) R(g, cs[(r + c) % 4], 2 + c * 5, 3 + r * 4, 5, 4);
+          R(g, '#241a14', 7, 2, 1, 16);
+        } else {
+          for (let y = 3; y < 18; y++) R(g, y < 9 ? '#1a2a4a' : '#142038', 2, y, 10, 1);
+          R(g, '#cfd8e8', 8, 5, 2, 2); R(g, '#8fa2c4', 9, 6, 1, 1);
+          R(g, '#241a14', 7, 3, 1, 15); R(g, '#241a14', 2, 10, 10, 1);
+          R(g, '#58395f', 0, 2, 3, 17); R(g, '#7a4f82', 0, 2, 1, 17); R(g, '#58395f', 11, 2, 3, 17); R(g, '#7a4f82', 13, 2, 1, 17);
+        }
+        R(g, '#5a4636', 0, 18, 14, 2); R(g, '#8a7660', 0, 18, 14, 1); R(g, '#241a14', 0, 20, 14, 2);
+      }));
+    }
+    function sprPainting(v) {
+      return S('paint' + v, () => mk(18, 14, g => {
+        const bg = ['#1a2230', '#2a1a22', '#1a2a22'][v % 3], suit = ['#3a3a4a', '#4a2a2a', '#2a3a3a'][v % 3];
+        R(g, '#b08a3c', 0, 0, 18, 14); R(g, '#e8cf7a', 0, 0, 18, 1); R(g, '#7a5a20', 0, 13, 18, 1);
+        R(g, bg, 2, 2, 14, 10); R(g, suit, 5, 8, 8, 4); R(g, '#d9b99b', 7, 4, 4, 4); R(g, '#2a1a10', 7, 3, 4, 2);
+        R(g, '#1a1216', 8, 6, 1, 1); R(g, '#1a1216', 10, 6, 1, 1);
+      }));
+    }
+    function sprTrophy() {
+      return S('trophy', () => mk(18, 14, g => {
+        R(g, '#4a2f1d', 4, 8, 10, 6); R(g, '#7a5538', 5, 4, 8, 7); R(g, '#9a7050', 5, 4, 8, 1);
+        R(g, '#1a1216', 6, 6, 1, 1); R(g, '#1a1216', 11, 6, 1, 1); R(g, '#2a1a10', 8, 9, 2, 2);
+        R(g, '#d9c9a5', 3, 0, 1, 5); R(g, '#d9c9a5', 2, 0, 2, 1); R(g, '#d9c9a5', 14, 0, 1, 5); R(g, '#d9c9a5', 14, 0, 2, 1);
+        R(g, '#d9c9a5', 5, 2, 1, 3); R(g, '#d9c9a5', 12, 2, 1, 3);
+      }));
+    }
+    function sprDoor() {
+      return S('door', () => mk(26, 34, g => {
+        R(g, '#1a0f08', 0, 0, 26, 34); R(g, '#4a2f1d', 1, 1, 24, 1);
+        R(g, '#5a3a24', 2, 3, 10, 31); R(g, '#5a3a24', 14, 3, 10, 31);
+        R(g, '#6a4630', 3, 5, 8, 12); R(g, '#6a4630', 15, 5, 8, 12); R(g, '#6a4630', 3, 19, 8, 13); R(g, '#6a4630', 15, 19, 8, 13);
+        R(g, '#7e5a3c', 3, 5, 8, 1); R(g, '#7e5a3c', 15, 5, 8, 1);
+        R(g, '#d4a94a', 10, 20, 1, 4); R(g, '#d4a94a', 15, 20, 1, 4);
+        R(g, '#241509', 12, 3, 2, 31);
+      }));
+    }
+    function sprSconce() {
+      return S('sconce', () => mk(8, 12, g => {
+        R(g, '#6a5a3a', 3, 6, 2, 6); R(g, '#8a7650', 1, 5, 6, 2); R(g, '#b9a06a', 1, 5, 6, 1);
+        R(g, '#e9e2cf', 3, 2, 2, 4);
+      }));
+    }
+    function sprFlame(f) {
+      return S('flame' + f, () => mk(4, 6, g => {
+        R(g, '#f08a2a', 1, 2 - (f % 2), 2, 4); R(g, '#f7c948', 1, 3 - (f % 2), 2, 2); R(g, '#fff1b0', 1, 4 - (f % 2), 1, 1);
+      }));
+    }
+
+    const charCache = {};
+    function charSprite(p, dir, fr) {
+      const key = [p.id, dir, fr].join('|');
+      if (charCache[key]) return charCache[key];
+      const skin = p.skinTone, sk2 = shade(skin, -0.2), hair = p.hairColor;
+      const jk = p.jacketColor, jk2 = shade(jk, -0.3), vest = p.vestColor;
+      const pants = p.pantsColor, pt2 = shade(pants, -0.3), shoe = '#17100f';
+      const hat = p.hatColor || '#6a4a2a';
+      const lo = fr === 1 ? -1 : fr === 2 ? 1 : 0;
+      const d = dir === 'right' ? 'left' : dir;
+      const base = mk(16, 24, g => {
+        if (d === 'left') {
+          R(g, pants, 6 + lo, 18, 3, 4); R(g, pt2, 8 - lo, 18, 3, 4);
+          R(g, shoe, 5 + lo, 22, 4, 2); R(g, shoe, 7 - lo, 22, 4, 2);
+          R(g, jk, 5, 11, 6, 7); R(g, jk2, 10, 11, 1, 7); R(g, vest, 5, 11, 2, 6); R(g, '#2a1a10', 5, 17, 6, 1);
+          R(g, jk, 7 - lo, 11, 2, 6); R(g, jk2, 7 - lo, 16, 2, 1); R(g, skin, 7 - lo, 17, 2, 2);
+          R(g, skin, 5, 3, 7, 7); R(g, sk2, 5, 9, 7, 1); R(g, sk2, 6, 10, 4, 1);
+          R(g, sk2, 4, 7, 1, 1);
+          R(g, '#ffffff', 6, 6, 2, 2); R(g, '#1a1216', 6, 7, 1, 1); R(g, hair, 6, 5, 2, 1);
+          R(g, '#a0524a', 6, 9, 2, 1);
+          if (p.hat) {
+            R(g, hat, 3, 3, 10, 2); R(g, hat, 5, 0, 7, 4); R(g, shade(hat, -0.4), 5, 3, 7, 1); R(g, shade(hat, 0.2), 5, 0, 7, 1);
+            R(g, hair, 9, 5, 3, 3);
+          } else if (p.longHair) {
+            R(g, hair, 5, 2, 7, 4); R(g, hair, 8, 5, 4, 10); R(g, hair, 5, 3, 1, 2);
+          } else {
+            R(g, hair, 5, 2, 7, 3); R(g, hair, 9, 5, 3, 4); R(g, hair, 5, 3, 1, 2);
+          }
+          if (p.beard) { R(g, hair, 5, 9, 5, 2); R(g, hair, 6, 11, 3, 1); R(g, '#7a3a34', 6, 9, 2, 1); }
+        } else {
+          const back = d === 'up';
+          R(g, pants, 5, 18, 3, 4); R(g, pt2, 7, 18, 1, 4);
+          R(g, pants, 9, 18, 3, 4); R(g, pt2, 11, 18, 1, 4);
+          R(g, shoe, 4, 22 + lo, 4, 2); R(g, shoe, 8, 22 - lo, 4, 2);
+          R(g, jk, 4, 11, 8, 7); R(g, jk2, 11, 11, 1, 7);
+          if (!back) {
+            R(g, vest, 6, 11, 4, 6); R(g, shade(vest, -0.3), 8, 12, 1, 1); R(g, shade(vest, -0.3), 8, 14, 1, 1); R(g, '#7a2430', 7, 11, 2, 3);
+          } else {
+            R(g, shade(jk, 0.15), 5, 11, 1, 6);
+          }
+          R(g, '#2a1a10', 4, 17, 8, 1);
+          R(g, jk, 2, 11 - lo, 2, 6); R(g, jk2, 2, 16 - lo, 2, 1); R(g, skin, 2, 17 - lo, 2, 2);
+          R(g, jk, 12, 11 + lo, 2, 6); R(g, jk2, 12, 16 + lo, 2, 1); R(g, skin, 12, 17 + lo, 2, 2);
+          R(g, skin, 4, 3, 8, 7); R(g, sk2, 4, 9, 8, 1); R(g, sk2, 6, 10, 4, 1);
+          R(g, sk2, 3, 6, 1, 2); R(g, sk2, 12, 6, 1, 2);
+          if (!back) {
+            R(g, '#ffffff', 5, 6, 2, 2); R(g, '#ffffff', 9, 6, 2, 2);
+            R(g, '#1a1216', 6, 7, 1, 1); R(g, '#1a1216', 9, 7, 1, 1);
+            R(g, hair, 5, 5, 2, 1); R(g, hair, 9, 5, 2, 1);
+            R(g, sk2, 8, 8, 1, 1); R(g, '#a0524a', 7, 9, 2, 1);
+          }
+          if (p.hat) {
+            R(g, hat, 2, 3, 12, 2); R(g, hat, 4, 0, 8, 4); R(g, shade(hat, -0.4), 4, 3, 8, 1); R(g, shade(hat, 0.2), 4, 0, 8, 1);
+            R(g, hair, 3, 5, 1, 2); R(g, hair, 12, 5, 1, 2);
+            if (back) R(g, hair, 4, 5, 8, 3);
+          } else if (p.longHair) {
+            R(g, hair, 3, 2, 10, 4); R(g, hair, 3, 6, 2, 9); R(g, hair, 11, 6, 2, 9);
+            if (back) R(g, hair, 4, 6, 8, 9);
+          } else {
+            R(g, hair, 4, 2, 8, 3); R(g, hair, 3, 3, 1, 4); R(g, hair, 12, 3, 1, 4);
+            if (back) R(g, hair, 4, 5, 8, 4); else { R(g, hair, 4, 5, 3, 1); R(g, hair, 9, 5, 3, 1); }
+          }
+          if (p.beard && !back) {
+            R(g, hair, 4, 9, 8, 2); R(g, hair, 5, 11, 6, 1); R(g, '#7a3a34', 7, 9, 2, 1);
+          }
+        }
+      });
+      const out = outline(dir === 'right' ? flipX(base) : base);
+      charCache[key] = out;
+      return out;
+    }
+
+    function sprClue(type) {
+      return S('clue' + type, () => {
+        if (type === 'victim') {
+          return outline(mk(42, 20, g => {
+            ellipseFill(g, 22, 13, 19, 6, '#3a0a0d');
+            ellipseFill(g, 22, 12, 18, 6, '#5a0f14');
+            ellipseFill(g, 20, 11, 10, 3, '#7a1a1f');
+            R(g, '#2a2f3d', 22, 9, 14, 5); R(g, '#1a1f2b', 22, 13, 14, 1);
+            R(g, '#17100f', 36, 9, 4, 5); R(g, '#17100f', 36, 9, 1, 5);
+            R(g, '#3a3f55', 10, 5, 13, 9); R(g, '#e9e2cf', 15, 5, 4, 9); R(g, '#7a2430', 16, 6, 2, 4);
+            R(g, '#4a4f68', 10, 5, 13, 1);
+            R(g, '#3a3f55', 11, 14, 9, 3); R(g, '#e0b890', 8, 15, 3, 2);
+            R(g, '#3a3f55', 16, 2, 9, 3); R(g, '#e0b890', 25, 2, 3, 3);
+            R(g, '#e0b890', 3, 6, 8, 8); R(g, '#c49a74', 3, 13, 8, 1);
+            R(g, '#8d8d92', 3, 4, 8, 3); R(g, '#8d8d92', 2, 5, 1, 4);
+            R(g, '#1a1216', 5, 9, 1, 1); R(g, '#1a1216', 7, 9, 1, 1);
+            R(g, '#7a1a1f', 3, 10, 2, 2);
+          }));
+        }
+        if (type === 'ornament') {
+          return outline(mk(14, 18, g => {
+            R(g, '#4a3515', 3, 14, 8, 3); R(g, '#6a4d20', 3, 14, 8, 1);
+            R(g, '#b5832a', 5, 6, 4, 9); R(g, '#e9c46a', 5, 6, 1, 9);
+            R(g, '#c99a3a', 5, 2, 4, 4); R(g, '#f0d27a', 5, 2, 1, 3);
+            R(g, '#b5832a', 2, 8, 3, 2); R(g, '#b5832a', 9, 8, 3, 2);
+            R(g, '#7a1a1f', 6, 4, 1, 1);
+          }));
+        }
+        if (type === 'safe') {
+          return outline(mk(20, 20, g => {
+            R(g, '#3d4249', 0, 0, 20, 20); R(g, '#5a6068', 0, 0, 20, 1);
+            R(g, '#0f1113', 3, 3, 11, 14); R(g, '#1a1d20', 3, 3, 11, 1);
+            R(g, '#e9e2cf', 5, 7, 4, 3); R(g, '#c9c2af', 6, 9, 6, 1); R(g, '#7a1a1f', 10, 12, 3, 2);
+            R(g, '#6c757d', 14, 2, 5, 16); R(g, '#8d969e', 14, 2, 1, 16);
+            R(g, '#adb5bd', 15, 8, 3, 3); R(g, '#f39c12', 16, 9, 1, 1);
+          }));
+        }
+        if (type === 'lock') {
+          return outline(mk(14, 26, g => {
+            R(g, '#5a3a24', 0, 0, 14, 26); R(g, '#6a4630', 1, 1, 12, 11); R(g, '#6a4630', 1, 14, 12, 11);
+            R(g, '#3a2416', 0, 12, 14, 2);
+            R(g, '#c9a24a', 8, 10, 5, 9); R(g, '#e8cf7a', 8, 10, 1, 9);
+            R(g, '#111', 10, 13, 2, 4);
+            R(g, '#e0d3b8', 9, 9, 1, 1); R(g, '#e0d3b8', 12, 12, 1, 1); R(g, '#e0d3b8', 8, 17, 1, 1);
+          }));
+        }
+        return outline(mk(22, 18, g => {
+          R(g, '#8c2f2f', 1, 10, 18, 5); R(g, '#d4a94a', 1, 10, 1, 5);
+          R(g, '#2f5f8c', 2, 6, 17, 4); R(g, '#d4a94a', 2, 6, 1, 4);
+          R(g, '#f0ead8', 3, 1, 15, 6); R(g, '#9a9486', 4, 3, 5, 1); R(g, '#9a9486', 11, 3, 5, 1); R(g, '#9a9486', 4, 5, 5, 1); R(g, '#9a9486', 11, 5, 5, 1);
+          R(g, '#6a6558', 10, 1, 1, 6);
+        }));
+      });
+    }
+
+    const PROPS = [
+      { t: 'fire', x: 430, y: 410 }, { t: 'shelf', x: 530, y: 410, a: 1 }, { t: 'shelf', x: 606, y: 410, a: 2 },
+      { t: 'desk', x: 740, y: 600, sortY: 560 }, { t: 'chair', x: 740, y: 640 },
+      { t: 'armchair', x: 380, y: 680, c: '#3f5f48' }, { t: 'table', x: 450, y: 710 },
+      { t: 'lamp', x: 800, y: 480 }, { t: 'plant', x: 800, y: 810, a: 3 }, { t: 'barrel', x: 330, y: 820 },
+      { t: 'fire', x: 1680, y: 410 }, { t: 'desk', x: 1900, y: 490, sortY: 430 }, { t: 'chair', x: 1900, y: 530 },
+      { t: 'piano', x: 2000, y: 700 }, { t: 'armchair', x: 1640, y: 700, c: '#6a2b4a' }, { t: 'armchair', x: 1700, y: 720, c: '#6a2b4a' },
+      { t: 'sofa', x: 1860, y: 810, c: '#2e5a52' }, { t: 'plant', x: 1590, y: 830, a: 4 }, { t: 'plant', x: 2070, y: 830, a: 5 },
+      { t: 'armor', x: 2050, y: 410 }, { t: 'lamp', x: 1760, y: 560 },
+      { t: 'door', x: 1200, y: 1010 }, { t: 'armor', x: 1090, y: 1010 }, { t: 'armor', x: 1310, y: 1010 },
+      { t: 'clock', x: 1420, y: 1010 },
+      { t: 'table', x: 960, y: 1210 }, { t: 'table', x: 1440, y: 1210 }, { t: 'plant', x: 940, y: 1330, a: 6 }, { t: 'plant', x: 1460, y: 1330, a: 7 },
+      { t: 'sofa', x: 1200, y: 1330, c: '#7a2e3a' }, { t: 'lamp', x: 1020, y: 1160 }, { t: 'lamp', x: 1380, y: 1160 },
+      { t: 'plant', x: 340, y: 1120, a: 8 }, { t: 'plant', x: 840, y: 1120, a: 9 }, { t: 'plant', x: 460, y: 1110, a: 10 }, { t: 'plant', x: 700, y: 1110, a: 11 },
+      { t: 'table', x: 500, y: 1260 }, { t: 'crate', x: 440, y: 1260 }, { t: 'barrel', x: 780, y: 1180 }, { t: 'barrel', x: 740, y: 1190 },
+      { t: 'fountain', x: 575, y: 1400 }, { t: 'chair', x: 700, y: 1330 }, { t: 'plant', x: 340, y: 1470, a: 12 }, { t: 'lamp', x: 820, y: 1330 },
+      { t: 'altar', x: 1825, y: 1075 }, { t: 'pew', x: 1710, y: 1190 }, { t: 'pew', x: 1710, y: 1260 },
+      { t: 'pew', x: 1940, y: 1190 }, { t: 'pew', x: 1940, y: 1260 },
+      { t: 'grave', x: 1620, y: 1420, a: 1 }, { t: 'grave', x: 1690, y: 1450, a: 2 }, { t: 'grave', x: 2040, y: 1430, a: 3 }, { t: 'grave', x: 1990, y: 1475, a: 1 },
+      { t: 'bush', x: 1590, y: 1330, a: 1 }, { t: 'bush', x: 2070, y: 1340, a: 2 }, { t: 'bush', x: 1830, y: 1490, a: 3 },
+      { t: 'door', x: 1175, y: 410 }, { t: 'armor', x: 1010, y: 410 }, { t: 'armor', x: 1340, y: 410 }, { t: 'clock', x: 1450, y: 410 },
+      { t: 'table', x: 1000, y: 640 }, { t: 'table', x: 1350, y: 640 }, { t: 'armchair', x: 955, y: 760, c: '#3f5f48' }, { t: 'armchair', x: 1395, y: 760, c: '#6a2b4a' },
+      { t: 'plant', x: 900, y: 470, a: 13 }, { t: 'plant', x: 1450, y: 800, a: 14 }, { t: 'lamp', x: 1070, y: 520 }, { t: 'lamp', x: 1290, y: 520 }
+    ];
+    const WINDOWS = [
+      [330, 384, ''], [790, 384, ''], [1590, 384, ''], [1800, 384, ''], [1960, 384, ''],
+      [940, 384, ''], [1400, 384, ''], [1465, 994, ''], [360, 1044, ''], [570, 1044, ''], [780, 1044, ''],
+      [1640, 1044, 'stained'], [2010, 1044, 'stained']
+    ];
+    const PAINTINGS = [[1880, 392, 0], [1362, 980, 1], [1290, 392, 2]];
+    const SCONCES = [[1150, 972], [1250, 972], [1760, 372], [2030, 372], [1730, 1020], [1920, 1020], [680, 1010], [470, 372], [1120, 372], [1230, 372]];
+    const LIGHTS = [];
+    PROPS.forEach(p => {
+      if (p.t === 'fire') LIGHTS.push({ x: p.x, y: p.y - 30, r: 78, a: 0.95, warm: true });
+      if (p.t === 'lamp') LIGHTS.push({ x: p.x, y: p.y - 60, r: 46, a: 0.9, warm: true });
+      if (p.t === 'altar') LIGHTS.push({ x: p.x, y: p.y - 50, r: 44, a: 0.85, warm: true });
+    });
+    SCONCES.forEach(s => LIGHTS.push({ x: s[0], y: s[1] - 20, r: 34, a: 0.8, warm: true }));
+    LIGHTS.push({ x: 1200, y: 1140, r: 90, a: 0.55, warm: true });
+    LIGHTS.push({ x: 575, y: 1250, r: 70, a: 0.5, warm: false });
+
+    let staticCv = null;
+    function buildStatic() {
+      const art = mk(AW, AH);
+      const g = art.getContext('2d');
+      R(g, '#06080c', 0, 0, AW, AH);
+      const rnd = rng(7);
+      paintFloor(g, { x:250, y:250, w:1900, h:1300, floorColor:'#4d3447' });
+      rooms.forEach(rm => { paintFloor(g, rm); });
+      paintRug(g, Math.round(575 / PX), Math.round(590 / PX), 30, 17, '#7a2e3a', '#5a1f2a');
+      paintRug(g, Math.round(1825 / PX), Math.round(620 / PX), 40, 22, '#2f4f7a', '#243b5c');
+      paintRunner(g, Math.round(1200 / PX) - 18, Math.round(1030 / PX), 36, 100, '#6a2b35');
+      paintRunner(g, Math.round(1175 / PX) - 18, Math.round(420 / PX), 36, 140, '#4a2b45');
+      paintRunner(g, Math.round(1825 / PX) - 9, Math.round(1090 / PX), 18, 90, '#5a2a3a');
+      rooms.forEach(rm => {
+        paintBackWall(g, rm, rnd);
+        const x0 = Math.round(rm.x / PX), y0 = Math.round(rm.y / PX) + Math.round(110 / PX), w = Math.round(rm.w / PX);
+        R(g, 'rgba(0,0,0,0.38)', x0, y0, w, 1); R(g, 'rgba(0,0,0,0.26)', x0, y0 + 1, w, 1);
+        R(g, 'rgba(0,0,0,0.16)', x0, y0 + 2, w, 1); R(g, 'rgba(0,0,0,0.08)', x0, y0 + 3, w, 2);
+      });
+      paintWalls(g);
+      const place = (c, wx, wy) => g.drawImage(c, Math.round(wx / PX - c.width / 2), Math.round(wy / PX - c.height));
+      WINDOWS.forEach(w => place(sprWindow(w[2]), w[0], w[1]));
+      PAINTINGS.forEach(p => place(sprPainting(p[2]), p[0], p[1]));
+      SCONCES.forEach(s => place(sprSconce(), s[0], s[1]));
+      place(sprTrophy(), 1060, 962);
+      staticCv = mk(AW * PX, AH * PX, c => {
+        c.imageSmoothingEnabled = false;
+        c.drawImage(art, 0, 0, AW, AH, 0, 0, AW * PX, AH * PX);
+        c.font = '600 13px "DM Mono",monospace';
+        c.textAlign = 'left';
+        rooms.forEach(rm => {
+          c.fillStyle = 'rgba(0,0,0,0.55)'; c.fillText(rm.name, rm.x + 21, rm.y + 137);
+          c.fillStyle = '#e8d9b0'; c.fillText(rm.name, rm.x + 20, rm.y + 136);
+        });
+      });
+    }
+
+    const lightCv = mk(AW, AH), lg = lightCv.getContext('2d');
+    let flash = 0, nextFlash = 3000;
+    const labelQueue = [];
+
+    function blit(c, x, y) {
+      const sx = Math.round((x - (c.width * PX) / 2) / PX) * PX;
+      const sy = Math.round((y - c.height * PX) / PX) * PX;
+      ctx.drawImage(c, 0, 0, c.width, c.height, sx, sy, c.width * PX, c.height * PX);
+    }
+    function softShadow(x, y, w) {
+      ctx.fillStyle = 'rgba(0,0,0,0.30)';
+      ctx.fillRect(Math.round((x - w / 2) / PX) * PX, Math.round((y - PX) / PX) * PX, w, PX * 2);
+    }
+
+    function drawProp(p, t) {
+      let c;
+      switch (p.t) {
+        case 'fire': c = sprFireplace(Math.floor(t / 130) % 3); break;
+        case 'shelf': c = sprBookshelf(p.a || 1); break;
+        case 'desk': c = sprDesk(); break;
+        case 'armchair': c = sprArmchair(p.c || '#6a2b4a'); break;
+        case 'sofa': c = sprSofa(p.c || '#2e5a52'); break;
+        case 'piano': c = sprPiano(); break;
+        case 'lamp': c = sprLamp(); break;
+        case 'plant': c = sprPlant(p.a || 1); break;
+        case 'barrel': c = sprBarrel(); break;
+        case 'crate': c = sprCrate(); break;
+        case 'clock': c = sprClock(); break;
+        case 'armor': c = sprArmor(); break;
+        case 'pew': c = sprPew(); break;
+        case 'altar': c = sprAltar(); break;
+        case 'grave': c = sprGrave(p.a || 1); break;
+        case 'fountain': c = sprFountain(Math.floor(t / 400) % 2); break;
+        case 'table': c = sprTable(); break;
+        case 'bush': c = sprBush(p.a || 1); break;
+        case 'chair': c = sprChair(); break;
+        case 'door': c = sprDoor(); break;
+        default: return;
+      }
+      if (p.t !== 'fire' && p.t !== 'door') softShadow(p.x, p.y, c.width * PX - 2 * PX);
+      blit(c, p.x, p.y);
+      if (p.t === 'altar') {
+        blit(sprFlame(Math.floor(t / 140) % 2), p.x - 25, p.y - 63);
+        blit(sprFlame(Math.floor(t / 140 + 1) % 2), p.x + 25, p.y - 63);
+      }
+      if (p.t === 'clock') {
+        const sx = Math.round((p.x - 18) / PX) * PX, sy = Math.round((p.y - 34 * PX) / PX) * PX;
+        const A = (ax, ay, aw, ah, col) => { ctx.fillStyle = col; ctx.fillRect(sx + ax * PX, sy + ay * PX, aw * PX, ah * PX); };
+        A(3, 4, 6, 6, '#e9e2cf');
+        const mm = gameMinutes % 60, hh = (gameMinutes / 60) % 12;
+        const ma = mm / 60 * Math.PI * 2, ha = hh / 12 * Math.PI * 2;
+        A(6, 7, 1, 1, '#1a1216');
+        A(6 + Math.round(Math.sin(ma) * 2.4), 7 - Math.round(Math.cos(ma) * 2.4), 1, 1, '#1a1216');
+        A(6 + Math.round(Math.sin(ha) * 1.4), 7 - Math.round(Math.cos(ha) * 1.4), 1, 1, '#7a2430');
+        A(3, 13, 6, 16, '#120a06');
+        const sw = Math.sin(t / 600);
+        A(Math.round(5.5 + sw * 0.9), 15, 1, 6, '#8a7650');
+        A(Math.round(5 + sw * 1.8), 21, 2, 2, '#e8cf7a');
+      }
+    }
+
+    function drawWindowRain(t) {
+      const wx = weatherNow(); if (wx === 'clear') return;
+      const sp = wx === 'storm' ? 70 : 150;
+      ctx.fillStyle = 'rgba(190,212,238,0.6)';
+      WINDOWS.forEach((w, i) => {
+        if (w[2] === 'stained') return;
+        const left = w[0] - 15, top = w[1] - 57;
+        for (let k = 0; k < 4; k++) {
+          const yy = ((t / sp) + k * 11 + i * 7) % 38;
+          ctx.fillRect(Math.round((left + 3 + k * 8) / PX) * PX, Math.round((top + yy) / PX) * PX, PX, PX * 2);
+        }
+      });
+    }
+
+    function drawChar(p, t) {
+      let dir = p.facing || 'down';
+      if (p !== player) {
+        if (p.walking) p._dir = Math.abs(p.vx) > Math.abs(p.vy) ? (p.vx < 0 ? 'left' : 'right') : (p.vy < 0 ? 'up' : 'down');
+        dir = p._dir || 'down';
+      }
+      const phase = p === player ? 0 : (p.id.length + p.id.charCodeAt(0)) % 4;
+      const fr = p.walking ? [0, 1, 0, 2][(Math.floor(t / 140) + phase) % 4] : 0;
+      const spr = charSprite(p, dir, fr);
+
+      const CHAR_SCALE = 1.25;
+      const charPX = PX * CHAR_SCALE;
+
+      const breath = !p.walking && Math.sin(t / 520 + phase * 1.9) > 0.35 ? Math.round(charPX / 2) : 0;
+      const bob = (p.walking && fr !== 0 ? charPX : 0) + breath;
+      const x = Math.round(p.x / PX) * PX, feet = Math.round((p.y + 33) / PX) * PX;
+      
+      ctx.fillStyle = 'rgba(0,0,0,0.34)';
+      ctx.fillRect(x - 4 * charPX, feet - charPX, 8 * charPX, charPX);
+      ctx.fillRect(x - 6 * charPX, feet, 12 * charPX, charPX);
+      ctx.fillRect(x - 4 * charPX, feet + charPX, 8 * charPX, charPX);
+
+      const drawW = spr.width * charPX;
+      const drawH = spr.height * charPX;
+      const sx = Math.round(x - drawW / 2);
+      const sy = Math.round(feet - drawH + 10 - bob);
+
+      ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(spr, 0, 0, spr.width, spr.height, sx, sy, drawW, drawH);
+
+      const label = p.shortName || p.name || '';
+      labelQueue.push(() => {
+        ctx.font = '10px "DM Mono",monospace';
+        ctx.textAlign = 'center';
+        const tw = Math.ceil(ctx.measureText(label).width) + 14;
+        const ly = sy - 18;
+        ctx.fillStyle = 'rgba(14,18,26,0.88)';
+        ctx.fillRect(Math.round(x - tw / 2), ly, tw, 16);
+        ctx.strokeStyle = p === player ? '#f39c12' : '#7a8794';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(Math.round(x - tw / 2) + 0.5, ly + 0.5, tw - 1, 15);
+        ctx.fillStyle = '#f8f5eb';
+        ctx.fillText(label, x, ly + 12);
+      });
+    }
+
+    function drawClue(o, t) {
+      const c = sprClue(o.type);
+      const found = clues.some(k => k.id === o.id);
+      const base = o.y + 18;
+      softShadow(o.x, base, c.width * PX);
+      blit(c, o.x, base);
+      if (!found) {
+        const top = base - c.height * PX - 10 - Math.round(Math.sin(t / 260) * 3);
+        const big = Math.floor(t / 350) % 2 === 0;
+        ctx.fillStyle = '#ffd45a';
+        const cx = Math.round(o.x / PX) * PX, cy = Math.round(top / PX) * PX;
+        ctx.fillRect(cx, cy - PX, PX, PX * 3);
+        ctx.fillRect(cx - PX, cy, PX * 3, PX);
+        if (big) {
+          ctx.fillStyle = 'rgba(255,212,90,0.6)';
+          ctx.fillRect(cx - 2 * PX, cy, PX, PX); ctx.fillRect(cx + 2 * PX, cy, PX, PX);
+          ctx.fillRect(cx, cy - 2 * PX, PX, PX); ctx.fillRect(cx, cy + 2 * PX, PX, PX);
+        }
+      }
+      if (Math.hypot(player.x - o.x, player.y - o.y) < 170) {
+        const label = o.name;
+        labelQueue.push(() => {
+          ctx.font = '9px "DM Mono",monospace';
+          ctx.textAlign = 'center';
+          const tw = Math.ceil(ctx.measureText(label).width) + 12;
+          const x = Math.round(o.x), y = base + 6;
+          ctx.fillStyle = 'rgba(14,18,26,0.85)';
+          ctx.fillRect(x - tw / 2, y, tw, 15);
+          ctx.strokeStyle = '#f39c12'; ctx.lineWidth = 1;
+          ctx.strokeRect(x - tw / 2 + 0.5, y + 0.5, tw - 1, 14);
+          ctx.fillStyle = '#f8f5eb';
+          ctx.fillText(label, x, y + 11);
+        });
+      }
+    }
+
+    function weatherNow() {
+      return gameMinutes < 13 * 60 ? 'storm' : gameMinutes < 16 * 60 ? 'drizzle' : 'clear';
+    }
+
+    function drawCourtyardRain(vx, vy, vw, vh, t) {
+      const cy = rooms.find(r => r.outdoor);
+      if (!cy) return;
+      const wx = weatherNow();
+      const n = wx === 'storm' ? 80 : wx === 'drizzle' ? 28 : 0;
+      ctx.fillStyle = wx === 'clear' ? 'rgba(120,90,70,0.10)' : 'rgba(50,70,100,0.20)';
+      ctx.fillRect(cy.x, cy.y + 110, cy.w, cy.h - 110);
+      ctx.save(); ctx.beginPath(); ctx.rect(cy.x, cy.y + 110, cy.w, cy.h - 110); ctx.clip();
+      ctx.fillStyle = 'rgba(170,185,210,0.07)';
+      for (let k = 0; k < 5; k++) {
+        const fx = cy.x + ((t * 0.012 * (1 + k * 0.4) + k * 170) % (cy.w + 260)) - 130;
+        const fy = cy.y + 190 + k * 60 + Math.round(Math.sin(t / 1800 + k) * 6);
+        ctx.fillRect(Math.round(fx / PX) * PX, Math.round(fy / PX) * PX, 220, 15);
+      }
+      ctx.restore();
+      if (!n) return;
+      const sec = t / 1000;
+      ctx.fillStyle = 'rgba(190,212,238,0.75)';
+      for (let i = 0; i < n; i++) {
+        const sp = (wx === 'storm' ? 520 : 300) + (i % 5) * 40;
+        const x = cy.x + ((i * 73.7 + sec * 70) % cy.w);
+        const y = cy.y + 112 + ((i * 131.3 + sec * sp) % (cy.h - 112));
+        ctx.fillRect(Math.round(x / PX) * PX, Math.round(y / PX) * PX, PX, PX * 3);
+      }
+      ctx.fillStyle = 'rgba(190,212,238,0.5)';
+      for (let i = 0; i < n / 4; i++) {
+        const ph = ((sec * 3 + i * 0.37) % 1);
+        if (ph < 0.5) {
+          const x = cy.x + ((i * 211.3) % cy.w), y = cy.y + 130 + ((i * 97.1) % (cy.h - 140));
+          ctx.fillRect(Math.round(x / PX) * PX - PX, Math.round(y / PX) * PX, PX, PX);
+          ctx.fillRect(Math.round(x / PX) * PX + PX, Math.round(y / PX) * PX, PX, PX);
+        }
+      }
+    }
+
+    function drawLighting(vx, vy, vw, vh, t) {
+      const sx = Math.max(0, Math.floor(vx / PX) - 2), sy = Math.max(0, Math.floor(vy / PX) - 2);
+      const sw = Math.min(AW - sx, Math.ceil(vw / PX) + 4), sh = Math.min(AH - sy, Math.ceil(vh / PX) + 4);
+      const m = gameMinutes;
+      let amb = m < 13 * 60 ? 0.50 : m < 16 * 60 ? 0.42 : 0.42 + Math.min(1, (m - 16 * 60) / (3 * 60)) * 0.2;
+      amb *= (1 - 0.55 * flash);
+      lg.globalCompositeOperation = 'source-over';
+      lg.clearRect(sx, sy, sw, sh);
+      lg.fillStyle = 'rgba(10,6,24,' + amb.toFixed(3) + ')';
+      lg.fillRect(sx, sy, sw, sh);
+      lg.globalCompositeOperation = 'destination-out';
+      const lights = LIGHTS.slice();
+      lights.push({ x: player.x, y: player.y - 10, r: 74, a: 1, warm: true });
+      if (flash > 0.08) WINDOWS.forEach(w => lights.push({ x: w[0], y: w[1] - 20, r: 70, a: flash * 0.9, warm: false }));
+      const warm = [];
+      lights.forEach((L, i) => {
+        const r = L.r * (1 + 0.035 * Math.sin(t / 95 + i * 1.7));
+        const cx = L.x / PX, cy = L.y / PX;
+        if (cx + r < sx || cx - r > sx + sw || cy + r < sy || cy - r > sy + sh) return;
+        const gr = lg.createRadialGradient(cx, cy, r * 0.12, cx, cy, r);
+        gr.addColorStop(0, 'rgba(0,0,0,' + L.a + ')');
+        gr.addColorStop(0.55, 'rgba(0,0,0,' + (L.a * 0.55).toFixed(3) + ')');
+        gr.addColorStop(1, 'rgba(0,0,0,0)');
+        lg.fillStyle = gr;
+        lg.fillRect(Math.floor(cx - r), Math.floor(cy - r), Math.ceil(r * 2), Math.ceil(r * 2));
+        if (L.warm) warm.push([L.x, L.y, r * PX]);
+      });
+      lg.globalCompositeOperation = 'source-over';
+      ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(lightCv, sx, sy, sw, sh, sx * PX, sy * PX, sw * PX, sh * PX);
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      warm.forEach(wm => {
+        const gr = ctx.createRadialGradient(wm[0], wm[1], 4, wm[0], wm[1], wm[2] * 0.8);
+        gr.addColorStop(0, 'rgba(255,150,60,0.16)');
+        gr.addColorStop(1, 'rgba(255,150,60,0)');
+        ctx.fillStyle = gr;
+        ctx.fillRect(wm[0] - wm[2], wm[1] - wm[2], wm[2] * 2, wm[2] * 2);
+      });
+      ctx.restore();
+    }
+
+    function draw() {
+      const t = performance.now();
+      const cont = document.getElementById('game-container');
+      const vx = Math.max(0, Math.min(W - 10, cont.scrollLeft)), vy = Math.max(0, Math.min(H - 10, cont.scrollTop));
+      const vw = Math.min(W - vx, (cont.clientWidth || window.innerWidth) + 8), vh = Math.min(H - vy, (cont.clientHeight || window.innerHeight) + 8);
+      if (!staticCv) buildStatic();
+      ctx.imageSmoothingEnabled = false;
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.drawImage(staticCv, vx, vy, vw, vh, vx, vy, vw, vh);
+
+      if (weatherNow() === 'storm' && t > nextFlash) { flash = 1; nextFlash = t + 6000 + Math.random() * 9000; }
+      flash *= 0.93;
+      if (flash < 0.01) flash = 0;
+
+      SCONCES.forEach((s, i) => {
+        const f = sprFlame((Math.floor(t / 140) + i) % 2);
+        blit(f, s[0], s[1] - 5 * PX - 2);
+      });
+      if (flash > 0.02) {
+        ctx.fillStyle = 'rgba(225,235,255,' + (flash * 0.85).toFixed(3) + ')';
+        WINDOWS.forEach(w => {
+          if (w[2] === 'stained') return;
+          ctx.fillRect(w[0] - 5 * PX, w[1] - 19 * PX, 10 * PX, 15 * PX);
+        });
+      }
+
+      drawWindowRain(t);
+      labelQueue.length = 0;
+      const items = [];
+      const near = (x, y) => x > vx - 220 && x < vx + vw + 220 && y > vy - 220 && y < vy + vh + 260;
+      PROPS.forEach(p => { if (near(p.x, p.y)) items.push({ y: p.sortY || p.y, f: () => drawProp(p, t) }); });
+      OBJECTS.forEach(o => { if (near(o.x, o.y)) items.push({ y: o.y + 18, f: () => drawClue(o, t) }); });
+      CHARACTERS.forEach(c => { if (near(c.x, c.y)) items.push({ y: c.y + 33, f: () => drawChar(c, t) }); });
+      items.push({ y: player.y + 33, f: () => drawChar(player, t) });
+      items.sort((a, b) => a.y - b.y).forEach(i => i.f());
+
+      drawCourtyardRain(vx, vy, vw, vh, t);
+      drawLighting(vx, vy, vw, vh, t);
+      labelQueue.forEach(f => f());
+
+      const wl = document.getElementById('weather-label');
+      if (wl) {
+        const wx = weatherNow();
+        const txt = (wx === 'storm' ? 'STORM' : wx === 'drizzle' ? 'DRIZZLE' : 'CLEAR DUSK') + ' \u00b7 DEADLINE 7:00 PM';
+        if (wl.textContent !== txt) wl.textContent = txt;
+      }
+    }
+
+    return { draw: draw };
+  })();
+
+  function draw() { PIXEL.draw(); }
+
+  function npcHome(c) {
+    if (!c._home) c._home = rooms.find(r => c.x >= r.x && c.x <= r.x + r.w && c.y >= r.y && c.y <= r.y + r.h) || { none: true };
+    return c._home;
+  }
+  function npcBlocked(c, x, y) {
+    if (blocked(x, y)) return true;
+    const h = npcHome(c);
+    if (h.none) return false;
+    const outsideNow = c.x < h.x + 50 || c.x > h.x + h.w - 50 || c.y < h.y + 125 || c.y > h.y + h.h - 45;
+    if (outsideNow) return false;
+    return x < h.x + 50 || x > h.x + h.w - 50 || y < h.y + 125 || y > h.y + h.h - 45;
+  }
+
+  function frame(time){
+    const elapsed=Math.min((time-lastTime)/1000,.04);lastTime=time;
+    if(!overlayOpen && !chatOpen) {
+      gameMinutes += elapsed * GAME_MINUTES_PER_SECOND;
+      if (gameMinutes - lastGossip >= 20) { lastGossip = gameMinutes; gossipTick(); }
+
+      if (gameMinutes >= DEADLINE_MINUTES && !deadlineTriggered) {
+        deadlineTriggered = true;
+        showOverlay(ENDINGS.timeout.title, ENDINGS.timeout.text, [{ label: "Restart Inquiry", onClick: () => location.reload() }]);
+      }
+
+      CHARACTERS.forEach(c => {
+        c.wanderTimer += elapsed;
+        if (c.wanderTimer > 5) {
+          c.wanderTimer = 0;
+          const still = Math.random() < 0.3;
+          c.vx = still ? 0 : (Math.random() - 0.5) * 0.08;
+          c.vy = still ? 0 : (Math.random() - 0.5) * 0.08;
+        }
+        const stx = c.vx * 1500 * elapsed, sty = c.vy * 1500 * elapsed;
+        let moved = false;
+        if (stx) { if (!npcBlocked(c, c.x + stx, c.y)) { c.x += stx; moved = true; } else c.wanderTimer = 5.01; }
+        if (sty) { if (!npcBlocked(c, c.x, c.y + sty)) { c.y += sty; moved = true; } else c.wanderTimer = 5.01; }
+        c.walking = moved;
+      });
+
+      let dx=0,dy=0;
+      if(keys.has('ArrowLeft')||keys.has('a'))dx--;
+      if(keys.has('ArrowRight')||keys.has('d'))dx++;
+      if(keys.has('ArrowUp')||keys.has('w'))dy--;
+      if(keys.has('ArrowDown')||keys.has('s'))dy++;
+      if(dx||dy){
+        player.facing=Math.abs(dx)>Math.abs(dy)?(dx<0?'left':'right'):(dy<0?'up':'down');
+        player.walking=true;
+        const len=Math.hypot(dx,dy);
+        movePlayer(dx/len*160*elapsed,dy/len*160*elapsed);
+      } else player.walking=false;
+    } else { CHARACTERS.forEach(c => c.walking = false); player.walking = false; }
+
+    document.getElementById("clock").textContent = formatTime();
+
+    const container = document.getElementById("game-container");
+    container.scrollTop = player.y - window.innerHeight / 2;
+    container.scrollLeft = player.x - window.innerWidth / 2;
+
+    const nearChar = CHARACTERS.find(c => Math.hypot(c.x - player.x, c.y - player.y) < 60);
+    const nearObj = OBJECTS.find(o => Math.hypot(o.x - player.x, o.y - player.y) < 50);
+
+    const hintEl = document.getElementById("hint");
+    if (nearChar) hintEl.textContent = "PRESS E TO TALK TO " + nearChar.shortName.toUpperCase();
+    else if (nearObj) hintEl.textContent = "PRESS E TO EXAMINE " + nearObj.name.toUpperCase();
+    else hintEl.textContent = "USE WASD OR ARROW KEYS TO EXPLORE THE ESTATE \u00b7 G: RUMOR MILL";
+
+    draw();
+    requestAnimationFrame(frame);
+  }
+
+  function openChat(npc) {
+    chatOpen = true; currentNpc = npc;
+    const fdx = player.x - npc.x, fdy = player.y - npc.y;
+    npc._dir = Math.abs(fdx) > Math.abs(fdy) ? (fdx < 0 ? 'left' : 'right') : (fdy < 0 ? 'up' : 'down');
+    player.facing = Math.abs(fdx) > Math.abs(fdy) ? (fdx < 0 ? 'right' : 'left') : (fdy < 0 ? 'down' : 'up');
+    document.getElementById("chat-box").style.display = "block";
+    document.getElementById("chat-name").textContent = npc.name + " (" + npc.role + ")";
+    updateTrustUI(npc);
+    const msgs = document.getElementById("messages"); msgs.innerHTML = "";
+    state[npc.id].log.forEach(e => addMessageUI(e.sender, e.text));
+    document.getElementById("message-input").focus();
+  }
+
+  function closeChat() {
+    chatOpen = false; document.getElementById("chat-box").style.display = "none";
+  }
+
+  function updateTrustUI(npc) {
+    const trust = state[npc.id].trust;
+    document.getElementById("trust-fill").style.width = (trust * 10) + "%";
+    document.getElementById("trust-text").textContent = "Trust " + trust + "/10";
+  }
+
+  function addMessageUI(sender, text, isThinking=false) {
+    const line = document.createElement("div");
+    if (isThinking) line.classList.add("thinking");
+    const name = document.createElement("strong"); name.textContent = sender + ": ";
+    line.appendChild(name); line.appendChild(document.createTextNode(text));
+    const msgs = document.getElementById("messages");
+    msgs.appendChild(line); msgs.scrollTop = msgs.scrollHeight;
+    return line;
+  }
+
+  function buildPrompt(npc, st) {
+    const canReveal = st.trust >= clueThreshold(npc) && !st.clueGiven;
+    let prompt = `You are ${npc.name}, ${npc.role} at Blackwood Manor in 1932.\n` +
+      `Current time: ${formatTime()}.\n` +
+      `Personality & Background: ${npc.personality}\n` +
+      `Your Secret (Keep hidden unless trust is earned): ${npc.secret}\n` +
+      `Current Trust Level: ${st.trust}/10 (Threshold required to share secret: ${clueThreshold(npc)}/10).\n\n` +
+      `RULES FOR YOUR RESPONSE:\n` +
+      `1. Stay strictly in character for a 1932 Victorian Gothic mystery.\n` +
+      `2. CONVERSATION CONTINUITY: You have ALREADY greeted the Detective with your opening line ("${npc.greeting}"). DO NOT repeat formal greetings, do NOT say "Good morning", "Good day", or "Hello, sir" again.\n` +
+      `3. Respond directly and naturally to what the player just said without restarting the conversation.\n` +
+      `4. Provide rich narrative context, subtle emotional cues, and detailed dialogue (aim for 2 to 3 sentences).\n`;
+
+    const mems = st.memories.slice(-5).map(m => '- [' + m.time + '] ' + m.text).join('\n') || '- nothing notable yet';
+    const rums = st.rumors.slice(-4).map(r => '- ' + r.from + ' told you: ' + r.text + ' (' + (r.believed ? 'you BELIEVE this' : 'you DOUBT this; ask the detective about it directly') + ')').join('\n') || '- none';
+    const mood = st.rep >= 2 ? 'warm and more forthcoming' : st.rep <= -2 ? 'cold, wary and curt' : 'neutral';
+    prompt += `\nYOUR OWN MEMORIES OF THE DETECTIVE:\n${mems}\nRUMORS YOU HEARD FROM OTHER STAFF:\n${rums}\nYour attitude toward the detective: ${mood}. Let memories and rumors colour your reply naturally; never mention scores or numbers.\n`;
+    if (npc.id === 'partner') {
+      prompt += `5. ANTI-CONFESSION GUARDRAIL: You are the murderer and embezzler, but you MUST NEVER confess or admit guilt under any circumstances. Deflect suspicion defensively, protect your reputation, and blame others if pressed.\n`;
+    }
+
+    if (canReveal) {
+      prompt += `6. Your trust is high enough. Subtly weave this clue into your dialogue: "${npc.clue}" Set give_clue to true.\n`;
+    } else {
+      prompt += `6. Do NOT reveal your secret or core clue yet. Set give_clue to false.\n`;
+    }
+
+    prompt += `\nOutput ONLY valid JSON in this exact format: {"reply": "...", "trust_change": 0, "give_clue": false, "memory": "one short sentence on what the detective just said or did", "importance": 1, "valence": 0}. importance is 1-5 (4-5 only for accusations, threats, promises or revelations). valence is -1 if the detective insulted, threatened, accused or lied to you, +1 if kind, helpful or honest, else 0`;
+    return prompt;
+  }
+
+  async function sendNpcMessage(npc, msg) {
+    const st = state[npc.id];
+    st.history.push({ role: "user", content: msg });
+    try {
+      const res = await fetch(GROQ_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": "Bearer " + GROQ_API_KEY },
+        body: JSON.stringify({
+          model: GROQ_MODEL,
+          messages: [{ role: "system", content: buildPrompt(npc, st) }, ...st.history.slice(-MAX_HISTORY_MESSAGES)],
+          temperature: 0.8, 
+          max_tokens: 700,
+          response_format: { type: "json_object" }
+        })
+      });
+      const data = await res.json();
+      const raw = data.choices?.[0]?.message?.content || "";
+      
+      let obj;
+      try {
+        const cleanedRaw = raw.replace(/```json/gi, "").replace(/```/g, "").trim();
+        const start = cleanedRaw.indexOf("{"), end = cleanedRaw.lastIndexOf("}");
+        if (start !== -1 && end !== -1 && end > start) {
+          obj = JSON.parse(cleanedRaw.slice(start, end + 1));
+        } else {
+          throw new Error("No valid JSON boundaries found");
+        }
+      } catch (parseErr) {
+        obj = {
+          reply: raw || "I am reflecting on your words carefully, Detective.",
+          trust_change: 0,
+          give_clue: false,
+          memory: "Detective spoke to me.",
+          importance: 2,
+          valence: 0
+        };
+      }
+
+      st.history.push({ role: "assistant", content: JSON.stringify(obj) });
+      return { 
+        reply: obj.reply, 
+        trustChange: Number(obj.trust_change) || 0, 
+        giveClue: obj.give_clue === true, 
+        memory: obj.memory, 
+        importance: Number(obj.importance) || 2, 
+        valence: Number(obj.valence) || 0 
+      };
+    } catch(e) {
+      st.history.pop();
+      return { reply: "I have nothing further to add right now.", trustChange: 0, giveClue: false };
+    }
+  }
+
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && chatOpen) { closeChat(); return; }
+    if (e.target instanceof HTMLInputElement) return;
+    const key = e.key.length === 1 ? e.key.toLowerCase() : e.key;
+    if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','w','a','s','d'].includes(key)) keys.add(key);
+
+    if (key === 'g') toggleRumorPanel();
+    if (key === 'e' || key === 'E') {
+      const nearChar = CHARACTERS.find(c => Math.hypot(c.x - player.x, c.y - player.y) < 60);
+      const nearObj = OBJECTS.find(o => Math.hypot(o.x - player.x, o.y - player.y) < 50);
+      if (overlayOpen || chatOpen) return;
+      if (nearChar) { e.preventDefault(); openChat(nearChar); }
+      else if (nearObj) {
+        const isNew = addClue(nearObj.id, nearObj.name, nearObj.summary, nearObj.keyClue);
+        showOverlay(nearObj.name, nearObj.description, [{ label: "Close", onClick: hideOverlay }]);
+        if (isNew) { toast("NEW EVIDENCE DISCOVERED!"); witnessExamine(nearObj); }
+      }
+    }
+    if (e.key === 'Escape' && chatOpen) closeChat();
+  });
+
+  document.addEventListener('keyup', e => keys.delete(e.key.length === 1 ? e.key.toLowerCase() : e.key));
+
+  document.getElementById("chat-form").addEventListener("submit", async e => {
+    e.preventDefault();
+    const input = document.getElementById("message-input");
+    const msg = input.value.trim();
+    if (!msg || waitingForReply) return;
+
+    const npc = currentNpc;
+    const st = state[npc.id];
+    state[npc.id].log.push({ sender: "You", text: msg });
+    addMessageUI("You", msg);
+    input.value = "";
+
+    if (/(sorry|apolog|forgive)/i.test(msg) && st.rep < 0) { st.rep = clampRep(st.rep + 2); renderRumorPanel(); }
+    if (st.rep <= -4) {
+      const cold = "I have heard what is said of you, Detective. We have nothing further to discuss.";
+      state[npc.id].log.push({ sender: npc.shortName, text: cold });
+      addMessageUI(npc.shortName, cold);
+      return;
+    }
+    const thinking = addMessageUI(npc.shortName, "thinking...", true);
+    waitingForReply = true;
+    const res = await sendNpcMessage(npc, msg);
+    thinking.remove();
+    waitingForReply = false;
+
+    state[npc.id].log.push({ sender: npc.shortName, text: res.reply });
+    addMessageUI(npc.shortName, res.reply);
+
+    const gm = guessMemory(msg);
+    const imp = res.importance >= 1 && res.importance <= 5 ? Math.round(res.importance) : gm.importance;
+    const val = [-1, 0, 1].includes(res.valence) ? res.valence : gm.valence;
+    addMemory(npc.id, (res.memory ? String(res.memory).slice(0, 140) : gm.memory), imp, val, 'direct');
+    if (imp >= 4) toast(npc.shortName.toUpperCase() + " WILL REMEMBER THAT");
+    st.trust = Math.max(0, Math.min(10, st.trust + res.trustChange));
+    updateTrustUI(npc);
+
+    if (res.giveClue && !st.clueGiven) {
+      st.clueGiven = true;
+      addClue(npc.id + "_clue", npc.shortName, npc.summary, npc.keyClue);
+      toast("NEW CLUE OBTAINED FROM " + npc.shortName.toUpperCase());
+    }
+  });
+
+  document.getElementById("close-chat").addEventListener("click", closeChat);
+
+  document.getElementById("accuse-btn").addEventListener("click", () => {
+    if (clues.length < MIN_CLUES_TO_ACCUSE) {
+      showOverlay("Insufficient Clues", "Find at least " + MIN_CLUES_TO_ACCUSE + " total clues before making an accusation.", [{ label: "Back", onClick: hideOverlay }]);
+      return;
+    }
+    const buttons = CHARACTERS.map(c => ({
+      label: c.name,
+      onClick: () => {
+        const keyClueCount = clues.filter(c => c.key === true).length;
+        let ending = ENDINGS.wrong;
+
+        if (c.id === CULPRIT_ID) {
+          if (keyClueCount >= TOTAL_KEY_CLUES) {
+            ending = ENDINGS.perfect;
+          } else if (keyClueCount >= 3) {
+            ending = ENDINGS.justice;
+          } else {
+            ending = ENDINGS.wrong;
+          }
+        } else if (c.id === 'doctor') {
+          ending = ENDINGS.convenient;
+        } else if (c.id === 'cook') {
+          ending = ENDINGS.wrongHale;
+        } else {
+          ending = ENDINGS.wrong;
+        }
+
+        showOverlay(ending.title, ending.text, [{ label: "Restart Inquiry", onClick: () => location.reload() }]);
+      }
+    }));
+    buttons.push({ label: "Cancel", onClick: hideOverlay });
+    showOverlay("Accuse Suspect", "Who murdered Edward Blackwood?", buttons);
+  });
+
+  const SAVE_KEY = "crimepath_save_v1";
+  let gameOver = false;
+
+  function saveGame() {
+    if (gameOver) return;
+    if (gameMinutes < START_MINUTES + 1 && clues.length === 0) return;
+    try {
+      const data = {
+        savedAt: Date.now(),
+        gameMinutes: gameMinutes,
+        player: { x: player.x, y: player.y, facing: player.facing },
+        npcPositions: CHARACTERS.map(c => ({ id: c.id, x: c.x, y: c.y })),
+        state: state,
+        clues: clues,
+        lastNpcId: currentNpc ? currentNpc.id : null,
+        chatWasOpen: chatOpen
+      };
+      localStorage.setItem(SAVE_KEY, JSON.stringify(data));
+    } catch (e) {}
+  }
+
+  function loadSave() {
+    try {
+      const raw = localStorage.getItem(SAVE_KEY);
+      if (!raw) return null;
+      const data = JSON.parse(raw);
+      if (!data || typeof data.gameMinutes !== "number" || !data.state || !Array.isArray(data.clues)) return null;
+      return data;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function clearSave() {
+    gameOver = true;
+    try { localStorage.removeItem(SAVE_KEY); } catch (e) {}
+  }
+
+  function applySave(data) {
+    gameMinutes = data.gameMinutes;
+
+    if (data.player) {
+      player.x = data.player.x;
+      player.y = data.player.y;
+      player.facing = data.player.facing || "down";
+    }
+
+    (data.npcPositions || []).forEach(p => {
+      const c = CHARACTERS.find(ch => ch.id === p.id);
+      if (c) { c.x = p.x; c.y = p.y; }
+    });
+
+    CHARACTERS.forEach(c => {
+      const s = data.state[c.id];
+      if (!s) return;
+      state[c.id].trust = s.trust;
+      state[c.id].history = s.history || [];
+      state[c.id].log = s.log || state[c.id].log;
+      state[c.id].clueGiven = !!s.clueGiven;
+      state[c.id].rep = s.rep || 0; state[c.id].memories = s.memories || []; state[c.id].rumors = s.rumors || [];
+    });
+
+    clues = data.clues;
+    updateInventoryUI();
+  }
+
+  function offerResume() {
+    const data = loadSave();
+    if (!data) return;
+
+    applySave(data);
+
+    const last = CHARACTERS.find(c => c.id === data.lastNpcId);
+    const lines = [
+      "Last saved: " + new Date(data.savedAt).toLocaleString(),
+      "Time in the manor: " + formatTime(),
+      "Evidence found: " + data.clues.length,
+      last ? "Last questioned: " + last.name : "You have not questioned anyone yet."
+    ];
+
+    showOverlay("Welcome back, Detective", lines.join("\n"), [
+      {
+        label: "Continue investigation",
+        onClick: () => {
+          hideOverlay();
+          toast("PROGRESS RESTORED");
+          if (last && data.chatWasOpen) openChat(last);
+        }
+      },
+      {
+        label: "Start new case",
+        onClick: () => { clearSave(); location.reload(); }
+      }
+    ]);
+  }
+
+  const originalShowOverlay = showOverlay;
+  showOverlay = function (title, text, buttons) {
+    if (String(title).indexOf("Ending") === 0) clearSave();
+    originalShowOverlay(title, text, buttons);
+  };
+
+  setInterval(saveGame, 3000);
+  window.addEventListener("beforeunload", saveGame);
+  document.addEventListener("visibilitychange", () => { if (document.hidden) saveGame(); });
+
+  offerResume();
+
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
